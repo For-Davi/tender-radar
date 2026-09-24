@@ -4,12 +4,16 @@ Não são mocks do código sob teste: são versões simples e reais dos contrato
 (`ContratacoesSource`, `BronzeRepository`...), com falhas que o teste pode ligar.
 """
 
-from collections.abc import Iterator
+import copy
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from datetime import date, datetime
 
+from radar.domain.entities import Contratacao, Fornecedor, Orgao
+from radar.domain.errors import DuplicateEntityError, ReferenceNotFoundError
+from radar.domain.value_objects import Cnpj
 from radar.events import EditalNovoV1
-from radar.ports.bronze import BronzeRecord, StoredDocument
+from radar.ports.bronze import BronzeRecord, BronzeVersion, StoredDocument
 from radar.ports.contratacoes_source import (
     ContratacaoRef,
     DocumentoRef,
@@ -20,6 +24,7 @@ from radar.ports.contratacoes_source import (
 )
 from radar.ports.document_storage import StorageError
 from radar.ports.events import PublishError
+from radar.ports.silver import Rejeicao
 
 
 def make_raw(sequencial: int, **payload_extra: object) -> RawContratacao:
@@ -124,3 +129,129 @@ class FakePublisher:
             self.failures_left -= 1
             raise PublishError("broker não confirmou")
         self.events.append(event)
+
+
+# ------------------------------------------------------------------ bronze -> silver
+
+
+@dataclass
+class InMemoryBronzeReader:
+    versions: list[BronzeVersion] = field(default_factory=list)
+    calls: list[tuple[datetime | None, datetime]] = field(default_factory=list)
+
+    def versions_between(
+        self, depois_de: datetime | None, ate: datetime
+    ) -> Iterator[BronzeVersion]:
+        self.calls.append((depois_de, ate))
+        selected = [
+            v
+            for v in self.versions
+            if (depois_de is None or v.vigente_desde > depois_de) and v.vigente_desde <= ate
+        ]
+        yield from sorted(selected, key=lambda v: v.vigente_desde)
+
+
+class _KeyedRepo[K, T]:
+    """Repositório em memória genérico: upsert/add/get por uma chave natural."""
+
+    def __init__(self, store: Callable[[], dict[K, T]], key_of: Callable[[T], K]) -> None:
+        self._store = store  # função: o dicionário muda quando a UoW faz rollback
+        self._key_of = key_of
+        self.fail_for: set[K] = set()  # chaves cuja gravação o "banco" recusa
+
+    def add(self, entity: T) -> None:
+        if self._key_of(entity) in self._store():
+            raise DuplicateEntityError(str(self._key_of(entity)))
+        self.upsert(entity)
+
+    def upsert(self, entity: T) -> None:
+        key = self._key_of(entity)
+        if key in self.fail_for:
+            raise ReferenceNotFoundError(f"recusado pelo banco: {key}")
+        self._store()[key] = copy.deepcopy(entity)
+
+    def get(self, key: K) -> T | None:
+        return self._store().get(key)
+
+
+@dataclass
+class SilverState:
+    orgaos: dict[Cnpj, Orgao] = field(default_factory=dict)
+    fornecedores: dict[str, Fornecedor] = field(default_factory=dict)
+    contratacoes: dict[str, Contratacao] = field(default_factory=dict)
+    rejeicoes: dict[tuple[str, str, int | None], Rejeicao] = field(default_factory=dict)
+    marcas: dict[str, datetime] = field(default_factory=dict)
+
+
+class _RejeicaoRepo:
+    def __init__(self, uow: "FakeSilverUnitOfWork") -> None:
+        self._uow = uow
+
+    def add(self, rejeicao: Rejeicao) -> None:
+        key = (rejeicao.numero_controle_pncp, rejeicao.bronze_hash, rejeicao.numero_item)
+        self._uow.pending.rejeicoes.setdefault(key, rejeicao)  # idempotente, como o UNIQUE
+
+
+class _WatermarkRepo:
+    def __init__(self, uow: "FakeSilverUnitOfWork") -> None:
+        self._uow = uow
+
+    def get(self, pipeline: str) -> datetime | None:
+        return self._uow.pending.marcas.get(pipeline)
+
+    def set(self, pipeline: str, marca: datetime) -> None:
+        self._uow.pending.marcas[pipeline] = marca
+
+
+class FakeSilverUnitOfWork:
+    """Silver em memória com transação:  só vira  no commit.
+
+    simula uma falha inesperada (ex.: banco caiu) ao gravar aquela contratação.
+    """
+
+    def __init__(self) -> None:
+        self.committed = SilverState()
+        self.pending = SilverState()
+        self.commits = 0
+        self.rollbacks = 0
+        self.crash_on: str | None = None
+        self._orgaos = _KeyedRepo[Cnpj, Orgao](lambda: self.pending.orgaos, lambda o: o.cnpj)
+        self._fornecedores = _KeyedRepo[str, Fornecedor](
+            lambda: self.pending.fornecedores, lambda f: f.documento
+        )
+        self._contratacoes = _KeyedRepo[str, Contratacao](
+            lambda: self.pending.contratacoes, self._contratacao_key
+        )
+
+    def _contratacao_key(self, contratacao: Contratacao) -> str:
+        if contratacao.numero_controle_pncp == self.crash_on:
+            raise RuntimeError("conexão com o banco perdida")
+        return contratacao.numero_controle_pncp
+
+    @property
+    def orgaos(self) -> _KeyedRepo[Cnpj, Orgao]:
+        return self._orgaos
+
+    @property
+    def fornecedores(self) -> _KeyedRepo[str, Fornecedor]:
+        return self._fornecedores
+
+    @property
+    def contratacoes(self) -> _KeyedRepo[str, Contratacao]:
+        return self._contratacoes
+
+    @property
+    def rejeicoes(self) -> _RejeicaoRepo:
+        return _RejeicaoRepo(self)
+
+    @property
+    def watermarks(self) -> _WatermarkRepo:
+        return _WatermarkRepo(self)
+
+    def commit(self) -> None:
+        self.committed = copy.deepcopy(self.pending)
+        self.commits += 1
+
+    def rollback(self) -> None:
+        self.pending = copy.deepcopy(self.committed)
+        self.rollbacks += 1
