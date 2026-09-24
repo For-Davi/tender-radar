@@ -28,6 +28,7 @@ out/
 dbt/target/
 dbt/logs/
 dbt/dbt_packages/
+dbt/.user.yml
 
 # --- Dados locais (nunca versionar dados brutos) ---
 data/*

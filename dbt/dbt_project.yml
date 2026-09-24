@@ -15,6 +15,10 @@ test-paths: ["tests"]
 macro-paths: ["macros"]
 clean-targets: ["target", "dbt_packages"]
 
+flags:
+  # não enviar estatísticas de uso anônimas para a dbt Labs
+  send_anonymous_usage_stats: false
+
 models:
   radar:
     staging:
