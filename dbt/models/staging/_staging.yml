@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: stg_orgao
+    description: Órgãos públicos (1 linha por CNPJ).
+    columns:
+      - name: orgao_id
+        data_tests: [unique, not_null]
+      - name: esfera
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["F", "E", "M", "D", "N"]
+
+  - name: stg_fornecedor
+    description: Fornecedores (1 linha por documento).
+    columns:
+      - name: fornecedor_id
+        data_tests: [unique, not_null]
+      - name: tipo_pessoa
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["PJ", "PF", "PE"]
+
+  - name: stg_contratacao
+    description: Contratações publicadas no PNCP (1 linha por número de controle).
+    columns:
+      - name: contratacao_id
+        data_tests: [unique, not_null]
+      - name: modalidade
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+                quote: false
+      - name: modalidade_nome
+        data_tests: [not_null]
+      - name: data_publicacao_local
+        data_tests: [not_null]
+
+  - name: stg_item
+    description: Itens das contratações (1 linha por item).
+    columns:
+      - name: item_id
+        data_tests: [unique, not_null]
+      - name: material_ou_servico
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["M", "S"]
+      - name: unidade_normalizada
+        data_tests: [not_null]

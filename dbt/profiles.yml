@@ -1,0 +1,16 @@
+# Conexão do dbt com o Postgres. Lê as MESMAS variáveis de ambiente do backend
+# (POSTGRES_*), então o .env da raiz serve para os dois. Nenhum segredo aqui.
+# O dbt procura este arquivo primeiro na pasta atual (dbt/), depois em ~/.dbt/.
+
+radar:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('POSTGRES_HOST', 'localhost') }}"
+      port: "{{ env_var('POSTGRES_PORT', '5432') | as_number }}"
+      user: "{{ env_var('POSTGRES_USER', 'radar') }}"
+      password: "{{ env_var('POSTGRES_PASSWORD', 'radar') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'radar') }}"
+      schema: gold  # padrão; cada pasta de modelos define o seu (dbt_project.yml)
+      threads: 4

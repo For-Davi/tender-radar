@@ -1,0 +1,35 @@
+version: 2
+
+sources:
+  - name: silver
+    description: >
+      Tabelas limpas escritas pelo pipeline bronze -> silver (Etapa 03). O dbt só LÊ
+      daqui; quem escreve é o backend (e as migrações do Alembic definem as tabelas).
+    schema: silver
+    tables:
+      - name: orgao
+        columns:
+          - name: id
+            data_tests: [unique, not_null]
+          - name: cnpj
+            data_tests: [unique, not_null]
+      - name: fornecedor
+        columns:
+          - name: id
+            data_tests: [unique, not_null]
+      - name: contratacao
+        columns:
+          - name: id
+            data_tests: [unique, not_null]
+          - name: numero_controle_pncp
+            data_tests: [unique, not_null]
+      - name: item_contratacao
+        columns:
+          - name: id
+            data_tests: [unique, not_null]
+          - name: contratacao_id
+            data_tests:
+              - relationships:
+                  arguments:
+                    to: source('silver', 'contratacao')
+                    field: id

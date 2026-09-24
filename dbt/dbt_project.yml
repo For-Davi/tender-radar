@@ -1,0 +1,35 @@
+# Projeto dbt da camada analítica (gold) do Radar de Licitações.
+#
+# silver (Postgres, escrito pelo pipeline da Etapa 03)
+#   -> staging (views: limpeza leve, nomes e tipos padronizados)
+#   -> gold    (tabelas: star schema + marts com funções de janela)
+
+name: radar
+version: "0.1.0"
+config-version: 2
+profile: radar
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  radar:
+    staging:
+      +schema: staging
+      # view: não guarda dados, sempre reflete a silver; barato de recriar
+      +materialized: view
+    marts:
+      +schema: gold
+      # table: as janelas são calculadas uma vez no build; a API lê pronto
+      +materialized: table
+
+vars:
+  # amostra mínima para o alerta de preço acima do percentil 90 (mart_percentil_preco_item)
+  min_itens_comparaveis: 5
+
+seeds:
+  radar:
+    +schema: staging

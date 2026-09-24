@@ -1,0 +1,21 @@
+version: 2
+
+seeds:
+  - name: ncm_capitulos
+    description: >
+      Os capítulos (2 primeiros dígitos) da Nomenclatura Comum do Mercosul, com nome
+      resumido. Dá nome às categorias da gold. O capítulo 77 é reservado e não existe.
+    config:
+      column_types:
+        capitulo: varchar(2)  # texto: "01" não pode virar o número 1
+    columns:
+      - name: capitulo
+        data_tests: [unique, not_null]
+
+  - name: unidades_sinonimos
+    description: >
+      Variantes de unidade de medida -> forma padrão, aplicado DEPOIS da macro
+      normalizar_unidade. Editar aqui (e rodar `dbt seed`) quando aparecer variante nova.
+    columns:
+      - name: variante
+        data_tests: [unique, not_null]
