@@ -46,10 +46,15 @@ O plano completo, etapa por etapa, está em [docs/ETAPAS.md](docs/ETAPAS.md) e o
 Pré-requisitos: Linux (ou WSL2), Docker com Compose v2, `make` e [uv](https://docs.astral.sh/uv/).
 
 ```bash
-make up          # cria o .env, sobe Postgres, Mongo, RabbitMQ e a API, espera ficarem healthy
+make up          # cria o .env, sobe Postgres, Mongo, RabbitMQ, a API e o worker de ingestão
 curl localhost:8000/health        # {"status":"ok"}
+make logs s=worker-ingestao       # acompanha a ingestão do PNCP
 make down        # derruba a stack (os dados continuam nos volumes)
 ```
+
+O worker de ingestão consulta o PNCP a cada hora (padrão: CE, pregão eletrônico e
+dispensa, últimos 2 dias; ajuste no `.env`), guarda o bruto no MongoDB, baixa os editais
+e publica o evento `edital.novo` no RabbitMQ.
 
 | Serviço | Endereço local |
 |---|---|
@@ -75,11 +80,13 @@ make fmt               # formata o código
 make check             # critério de "pronto": lint + tipos + testes + cobertura >= 80%
 make migrate           # aplica migrações pendentes do banco (o make up já faz isso)
 make migration m="..." # gera uma nova migração a partir dos modelos
+make ingest-once       # roda uma ingestão do PNCP agora e termina
 make pre-commit-install  # instala os hooks que rodam a cada commit
 ```
 
 ## Documentação
 
 - [Modelo relacional (diagrama ER)](docs/modelo-relacional.md)
+- [API do PNCP: endpoints e peculiaridades](docs/pncp-api.md)
 - [Decisões de arquitetura (ADRs)](docs/adr/)
 - [Documentos de aprendizado por etapa](docs/aprendizado/)
