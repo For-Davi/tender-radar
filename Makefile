@@ -4,7 +4,7 @@ BACKEND := backend
 UV := cd $(BACKEND) && uv run
 
 .DEFAULT_GOAL := help
-.PHONY: help up down down-volumes logs ps migrate migration test test-integration lint fmt check pre-commit-install pre-commit actionlint
+.PHONY: help up down down-volumes logs ps migrate migration ingest-once pncp-fixtures test test-integration lint fmt check pre-commit-install pre-commit actionlint
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -35,6 +35,13 @@ migrate: ## Aplica as migrações pendentes (no container)
 migration: .env ## Gera uma migração a partir dos modelos: make migration m="descricao"
 	@test -n "$(m)" || (echo "uso: make migration m=\"descricao da mudanca\"" && exit 1)
 	cd $(BACKEND) && set -a && . ../.env && set +a && uv run alembic revision --autogenerate 		--rev-id $$(printf "%04d" $$(( $$(ls alembic/versions/*.py | wc -l) + 1 ))) -m "$(m)"
+
+# ---------- Ingestão ----------
+ingest-once: ## Roda uma ingestão agora (no container) e termina
+	docker compose run --rm --build worker-ingestao python -m radar.workers.ingestao --once
+
+pncp-fixtures: ## Regrava as fixtures do PNCP a partir da API real (manual, nunca no CI)
+	$(UV) python scripts/gravar_fixtures_pncp.py
 
 # ---------- Qualidade ----------
 test: ## Testes unitários (rápidos, sem Docker)

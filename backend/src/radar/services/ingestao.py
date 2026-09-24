@@ -5,8 +5,9 @@ Regras de robustez:
 - falha em uma contratação, documento ou combinação modalidade/UF vira registro no
   relatório, e o lote continua;
 - idempotente: rodar de novo a mesma janela não duplica versões, arquivos nem eventos;
-- outbox: o evento de um documento só é marcado como publicado após a confirmação do
-  broker; o que ficou pendente é republicado na próxima execução.
+- outbox: o evento de um documento sai logo depois que ele é gravado, e só é marcado
+  como publicado após a confirmação do broker. O que ficou pendente (broker fora do
+  ar) é republicado no início da execução seguinte.
 """
 
 import hashlib
@@ -85,13 +86,18 @@ class IngestaoService:
         self._storage = storage
         self._publisher = publisher
         self._clock = clock
+        # se o broker falhar no meio de uma execução, não insiste até a próxima
+        self._broker_available = True
 
     def run(self, janela: JanelaIngestao) -> RelatorioIngestao:
         report = RelatorioIngestao()
+        self._broker_available = True
+        # primeiro, o que ficou pendente de execuções anteriores
+        for doc in self._bronze.pending_documents():
+            self._publish(doc, report)
         for modalidade in janela.modalidades:
             for uf in janela.ufs:
                 self._ingest_listing(janela, modalidade, uf, report)
-        self._publish_pending(report)
         return report
 
     # ------------------------------------------------------------------ etapas
@@ -162,38 +168,41 @@ class IngestaoService:
             self._fail(report, f"documento {documento.url}: {exc}")
             return
 
-        self._bronze.register_document(
-            StoredDocument(
-                numero_controle_pncp=ref.numero_controle_pncp,
-                sequencial_documento=documento.sequencial_documento,
-                caminho=caminho,
-                sha256=hashlib.sha256(content).hexdigest(),
-                tamanho_bytes=len(content),
-                tipo_arquivo=tipo,
-                baixado_em=self._clock(),
-            )
+        stored = StoredDocument(
+            numero_controle_pncp=ref.numero_controle_pncp,
+            sequencial_documento=documento.sequencial_documento,
+            caminho=caminho,
+            sha256=hashlib.sha256(content).hexdigest(),
+            tamanho_bytes=len(content),
+            tipo_arquivo=tipo,
+            baixado_em=self._clock(),
         )
+        # registra ANTES de publicar: se o processo cair aqui, o documento fica pendente
+        # e o evento sai na próxima execução (at-least-once)
+        self._bronze.register_document(stored)
         report.documentos_baixados += 1
+        self._publish(stored, report)
 
-    def _publish_pending(self, report: RelatorioIngestao) -> None:
-        for doc in self._bronze.pending_documents():
-            event = EditalNovoV1.for_document(
-                numero_controle_pncp=doc.numero_controle_pncp,
-                sequencial_documento=doc.sequencial_documento,
-                caminho=doc.caminho,
-                sha256=doc.sha256,
-                occurred_at=self._clock(),
-            )
-            try:
-                self._publisher.publish(event)
-            except PublishError as exc:
-                # broker fora do ar: os demais continuam pendentes para a próxima execução
-                self._fail(report, f"publicação de {doc.numero_controle_pncp}: {exc}")
-                return
-            self._bronze.mark_published(
-                doc.numero_controle_pncp, doc.sequencial_documento, self._clock()
-            )
-            report.eventos_publicados += 1
+    def _publish(self, doc: StoredDocument, report: RelatorioIngestao) -> None:
+        if not self._broker_available:
+            return  # fica pendente para a próxima execução
+        event = EditalNovoV1.for_document(
+            numero_controle_pncp=doc.numero_controle_pncp,
+            sequencial_documento=doc.sequencial_documento,
+            caminho=doc.caminho,
+            sha256=doc.sha256,
+            occurred_at=self._clock(),
+        )
+        try:
+            self._publisher.publish(event)
+        except PublishError as exc:
+            self._broker_available = False
+            self._fail(report, f"publicação de {doc.numero_controle_pncp}: {exc}")
+            return
+        self._bronze.mark_published(
+            doc.numero_controle_pncp, doc.sequencial_documento, self._clock()
+        )
+        report.eventos_publicados += 1
 
     @staticmethod
     def _fail(report: RelatorioIngestao, message: str) -> None:

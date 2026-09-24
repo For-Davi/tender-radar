@@ -16,7 +16,11 @@ x-backend: &backend
     - path: .env
       required: false                        # sem .env, valem os padrões de config.py
   environment:
-    POSTGRES_HOST: postgres                  # sobrescreve o "localhost" do .env
+    # dentro do Compose, o host de cada serviço é o nome dele (sobrescreve o "localhost" do .env)
+    POSTGRES_HOST: postgres
+    MONGO_HOST: mongo
+    RABBITMQ_HOST: rabbitmq
+    STORAGE_DIR: /data/editais
     LOG_JSON: "true"
 
 services:
@@ -89,7 +93,18 @@ services:
       retries: 5
       start_period: 10s
 
+  worker-ingestao:
+    <<: *backend
+    # a cada INGESTAO_INTERVALO_MINUTOS: PNCP -> Mongo (bronze) + PDFs + evento edital.novo
+    command: ["python", "-m", "radar.workers.ingestao"]
+    volumes: [editais_data:/data/editais]
+    restart: unless-stopped
+    depends_on:
+      mongo: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+
 volumes:
+  editais_data:
   pg_data:
   mongo_data:
   rabbit_data:

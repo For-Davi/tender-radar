@@ -171,7 +171,7 @@ class PncpClient:
             wait=self._wait,
             retry=retry_if_exception(lambda exc: isinstance(exc, _TransientError)),
             sleep=self._sleep,
-            before_sleep=self._log_retry,
+            before_sleep=lambda state: self._log_retry(state, url),
         )
         try:
             return retrying(attempt)
@@ -188,9 +188,9 @@ class PncpClient:
             return exc.retry_after
         return wait_exponential_jitter(initial=1, max=30, jitter=1)(state)
 
-    def _log_retry(self, state: RetryCallState) -> None:
+    def _log_retry(self, state: RetryCallState, url: str) -> None:
         exc = state.outcome.exception() if state.outcome else None
-        log.warning("pncp_nova_tentativa", tentativa=state.attempt_number, erro=str(exc))
+        log.warning("pncp_nova_tentativa", tentativa=state.attempt_number, url=url, erro=str(exc))
 
     def _request_once(self, url: str, params: dict[str, str | int] | None) -> httpx.Response:
         self._throttle()

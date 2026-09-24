@@ -58,7 +58,8 @@ class Settings(BaseSettings):
     # ---------- API do PNCP ----------
     pncp_consulta_url: str = "https://pncp.gov.br/api/consulta"
     pncp_api_url: str = "https://pncp.gov.br/api/pncp"
-    pncp_timeout_seconds: float = Field(default=30.0, gt=0)
+    # a API de detalhes do PNCP já foi medida respondendo em ~33 s: 30 s estourava sempre
+    pncp_timeout_seconds: float = Field(default=90.0, gt=0)
     pncp_max_attempts: int = Field(default=5, ge=1)
     pncp_min_interval_seconds: float = Field(default=0.2, ge=0)
 

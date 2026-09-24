@@ -24,7 +24,10 @@ RUN uv sync --frozen --no-dev --no-editable
 FROM python:3.12-slim AS runtime
 
 # Usuário sem privilégios: se a app for invadida, o atacante não é root no container.
-RUN useradd --create-home --uid 1000 appuser
+# /data/editais já nasce do appuser: um volume novo montado ali herda esse dono
+# (senão o volume seria do root e o worker não conseguiria gravar os PDFs).
+RUN useradd --create-home --uid 1000 appuser \
+    && mkdir -p /data/editais && chown appuser:appuser /data/editais
 
 WORKDIR /app
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv

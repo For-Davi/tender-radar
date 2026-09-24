@@ -275,3 +275,38 @@ def test_payload_hash_ignores_key_order() -> None:
 )
 def test_detect_file_type(content: bytes, expected: str) -> None:
     assert detect_file_type(content) == expected
+
+
+def test_event_is_published_as_soon_as_document_is_stored(env: Env) -> None:
+    """Regressão (achada na execução real): o evento só saía no fim da execução.
+
+    Com o PNCP lento, uma execução leva dezenas de minutos, e os editais já baixados
+    ficavam parados esperando. O evento do 1º edital deve sair antes do 2º download.
+    """
+    env.add(1)
+    env.add(2)
+    env.source.documentos[make_raw(2).ref.numero_controle_pncp] = [make_edital(2)]
+    events_at_download: list[int] = []
+    original_download = env.source.download
+
+    def spying_download(url: str) -> bytes:
+        events_at_download.append(len(env.publisher.events))
+        return original_download(url)
+
+    env.source.download = spying_download  # type: ignore[method-assign]
+
+    env.service.run(JANELA)
+
+    assert events_at_download == [0, 1]  # no 2º download, o 1º evento já tinha saído
+
+
+def test_pending_from_previous_run_is_published_at_start(env: Env) -> None:
+    env.add(1)
+    env.publisher.failures_left = 1
+    env.service.run(JANELA)  # broker fora: documento fica pendente
+    env.source.contratacoes.clear()  # na próxima execução, nada novo no PNCP
+
+    report = env.service.run(JANELA)
+
+    assert report.eventos_publicados == 1
+    assert env.bronze.pending_documents() == []
