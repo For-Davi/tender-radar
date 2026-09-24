@@ -1,0 +1,49 @@
+[
+  {
+    "naturezaJuridicaId": "2062",
+    "indicadorSubcontratacao": false,
+    "niFornecedor": "12561319000175",
+    "dataCancelamento": null,
+    "numeroItem": 1,
+    "dataInclusao": "2025-04-04T11:57:17",
+    "dataAtualizacao": "2025-04-04T11:57:17",
+    "tipoPessoa": "PJ",
+    "nomeRazaoSocialFornecedor": "NOVAINSTRUMENTS EQUIPAMENTOS PARA LABORATORIO LTDA",
+    "valorTotalHomologado": 1311000.0,
+    "reservaRemanescente": {
+      "codigo": 1,
+      "nome": "Não se aplica"
+    },
+    "timezoneCotacaoMoedaEstrangeira": null,
+    "moedaEstrangeira": null,
+    "valorNominalMoedaEstrangeira": null,
+    "dataCotacaoMoedaEstrangeira": null,
+    "codigoPais": "BRA",
+    "porteFornecedorId": 1,
+    "quantidadeHomologada": 114.0,
+    "valorUnitarioHomologado": 11500.0,
+    "percentualDesconto": 0.0,
+    "amparoLegalMargemPreferencia": null,
+    "amparoLegalCriterioDesempate": {
+      "id": 148,
+      "nome": "Lei 14.133/2021, art. 60, outros incisos",
+      "descricao": "Critério de desempate: Utilizar esse código quando a justificativa de desempate via art. 60, derivar de outros incisos da Lei 14.133/2021 que não estão previstos nos Amparos Legais, códigos 145; 146; e 147, constantes no Manual de Integração do PNCP em seu item 5.15. Amparo Legal.",
+      "statusAtivo": true
+    },
+    "paisOrigemProdutoServico": null,
+    "localidadeExterior": null,
+    "ordemClassificacaoSrp": 1,
+    "dataResultado": "2025-04-04",
+    "motivoCancelamento": null,
+    "situacaoCompraItemResultadoId": 1,
+    "numeroControlePNCPCompra": "07954480000179-1-001878/2025",
+    "aplicacaoMargemPreferencia": false,
+    "aplicacaoBeneficioMeEpp": true,
+    "aplicacaoCriterioDesempate": true,
+    "porteFornecedorNome": "ME",
+    "situacaoCompraItemResultadoNome": "Informado",
+    "sequencialResultado": 1,
+    "naturezaJuridicaNome": "Sociedade Empresária Limitada",
+    "localidadeFornecedor": null
+  }
+]
