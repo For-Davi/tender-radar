@@ -4,8 +4,11 @@ version = "0.1.0"
 description = "Radar de Licitações: ingestão, análise e IA sobre contratações públicas do PNCP."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic>=1.20.0",
     "fastapi>=0.141.1",
+    "psycopg[binary]>=3.3.6",
     "pydantic-settings>=2.15.0",
+    "sqlalchemy>=2.0.54",
     "structlog>=26.1.0",
     "uvicorn[standard]>=0.53.0",
 ]
@@ -20,7 +23,6 @@ dev = [
     "mypy>=2.3.1",
     "pika>=1.4.4",
     "pre-commit>=4.6.2",
-    "psycopg[binary]>=3.3.6",
     "pymongo>=4.18.2",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
