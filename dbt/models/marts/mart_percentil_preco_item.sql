@@ -11,6 +11,7 @@ with ranqueados as (
         numero_item,
         orgao_key,
         categoria_key,
+        categoria_classificada,
         unidade_normalizada,
         data_publicacao,
         valor_unitario_estimado,
@@ -29,12 +30,16 @@ select
     numero_item,
     orgao_key,
     categoria_key,
+    categoria_classificada,
     unidade_normalizada,
     data_publicacao,
     valor_unitario_estimado,
     round(percentil::numeric, 4) as percentil_preco,
     itens_comparaveis,
-    -- com poucos itens, "o mais caro de 2" não quer dizer nada: exige amostra mínima
-    percentil >= 0.9 and itens_comparaveis >= {{ var('min_itens_comparaveis') }}
-        as acima_p90
+    -- o alerta só vale quando a comparação faz sentido:
+    -- * categoria classificada (sem NCM, "comparáveis" podem ser uma van e uma caneta);
+    -- * amostra mínima (com 2 itens, "o mais caro" não quer dizer nada)
+    percentil >= 0.9
+    and categoria_classificada
+    and itens_comparaveis >= {{ var('min_itens_comparaveis') }} as acima_p90
 from ranqueados

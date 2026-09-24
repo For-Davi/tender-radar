@@ -22,6 +22,8 @@ select
     c.uf,
     c.municipio,
     i.material_ou_servico,
+    -- categoria de verdade (com NCM) ou "sem classificação" (a maioria dos itens)
+    i.ncm_capitulo is not null as categoria_classificada,
     i.unidade_normalizada,
     i.orcamento_sigiloso,
 

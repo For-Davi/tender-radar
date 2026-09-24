@@ -197,19 +197,26 @@ unit_tests:
       5 itens de A/UNIDADE (10..50) viram percentis 0; 0,25; 0,5; 0,75; 1 e só o de 50
       fica acima do p90. A/CAIXA sozinho tem percentil 0. Em B só há 2 itens: o mais caro
       tem percentil 1, mas não gera alerta (amostra mínima = 5). Sigiloso não entra.
+      Em S (sem classificação/NCM) o mais caro de 5 também não gera alerta: sem
+      categoria, "comparáveis" podem ser uma van e uma caneta.
     model: mart_percentil_preco_item
     given:
       - input: ref('fato_contratacao_item')
         rows:
-          - {item_key: a1, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: 30}
-          - {item_key: a2, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: 10}
-          - {item_key: a3, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: 50}
-          - {item_key: a4, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: 20}
-          - {item_key: a5, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: 40}
-          - {item_key: a6, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: null}
-          - {item_key: c1, categoria_key: A, unidade_normalizada: CAIXA, valor_unitario_estimado: 99}
-          - {item_key: b1, categoria_key: B, unidade_normalizada: UNIDADE, valor_unitario_estimado: 1}
-          - {item_key: b2, categoria_key: B, unidade_normalizada: UNIDADE, valor_unitario_estimado: 1000}
+          - {item_key: a1, categoria_key: A, unidade_normalizada: UNIDADE, categoria_classificada: true, valor_unitario_estimado: 30}
+          - {item_key: a2, categoria_key: A, unidade_normalizada: UNIDADE, categoria_classificada: true, valor_unitario_estimado: 10}
+          - {item_key: a3, categoria_key: A, unidade_normalizada: UNIDADE, categoria_classificada: true, valor_unitario_estimado: 50}
+          - {item_key: a4, categoria_key: A, unidade_normalizada: UNIDADE, categoria_classificada: true, valor_unitario_estimado: 20}
+          - {item_key: a5, categoria_key: A, unidade_normalizada: UNIDADE, categoria_classificada: true, valor_unitario_estimado: 40}
+          - {item_key: a6, categoria_key: A, unidade_normalizada: UNIDADE, categoria_classificada: true, valor_unitario_estimado: null}
+          - {item_key: c1, categoria_key: A, unidade_normalizada: CAIXA, categoria_classificada: true, valor_unitario_estimado: 99}
+          - {item_key: b1, categoria_key: B, unidade_normalizada: UNIDADE, categoria_classificada: true, valor_unitario_estimado: 1}
+          - {item_key: b2, categoria_key: B, unidade_normalizada: UNIDADE, categoria_classificada: true, valor_unitario_estimado: 1000}
+          - {item_key: s1, categoria_key: S, unidade_normalizada: UNIDADE, categoria_classificada: false, valor_unitario_estimado: 1}
+          - {item_key: s2, categoria_key: S, unidade_normalizada: UNIDADE, categoria_classificada: false, valor_unitario_estimado: 2}
+          - {item_key: s3, categoria_key: S, unidade_normalizada: UNIDADE, categoria_classificada: false, valor_unitario_estimado: 3}
+          - {item_key: s4, categoria_key: S, unidade_normalizada: UNIDADE, categoria_classificada: false, valor_unitario_estimado: 4}
+          - {item_key: s5, categoria_key: S, unidade_normalizada: UNIDADE, categoria_classificada: false, valor_unitario_estimado: 500}
     expect:
       rows:
         - {item_key: a2, percentil_preco: "0.0000", itens_comparaveis: 5, acima_p90: false}
@@ -220,3 +227,8 @@ unit_tests:
         - {item_key: c1, percentil_preco: "0.0000", itens_comparaveis: 1, acima_p90: false}
         - {item_key: b1, percentil_preco: "0.0000", itens_comparaveis: 2, acima_p90: false}
         - {item_key: b2, percentil_preco: "1.0000", itens_comparaveis: 2, acima_p90: false}
+        - {item_key: s1, percentil_preco: "0.0000", itens_comparaveis: 5, acima_p90: false}
+        - {item_key: s2, percentil_preco: "0.2500", itens_comparaveis: 5, acima_p90: false}
+        - {item_key: s3, percentil_preco: "0.5000", itens_comparaveis: 5, acima_p90: false}
+        - {item_key: s4, percentil_preco: "0.7500", itens_comparaveis: 5, acima_p90: false}
+        - {item_key: s5, percentil_preco: "1.0000", itens_comparaveis: 5, acima_p90: false}
