@@ -74,6 +74,8 @@ Lista: `sequencialDocumento`, `tipoDocumentoId` (**2 = Edital**), `tipoDocumento
 | `tamanhoPagina=51` → **400** ("Tamanho de página inválido") | Página fixa em 50 |
 | Página além da última → **204 sem corpo** (não `data: []`) | 204 encerra a paginação |
 | Itens/arquivos sem conteúdo → **204** | 204 vira lista vazia |
+| **Itens, resultados e arquivos paginam, com 10 por página por padrão** (sem `pagina`/`tamanhoPagina` vêm só os 10 primeiros). Aceitam `tamanhoPagina` grande (1000 testado). Encontrado na Etapa 03: contratação com 11 itens na API e 10 na bronze | Paginação com 500 por página; para em página incompleta ou 204 |
+| Orçamento sigiloso (`orcamentoSigiloso: true`) chega com `valorUnitarioEstimado: 0` e total `0` | Na silver vira **nulo** (desconhecido), nunca 0 |
 | Filtro `uf` reduz muito o volume (1.576 → 35 num dia, pregão) | Ingestão por UF configurável (padrão CE) |
 | Datas **sem fuso** (`"2025-09-01T00:00:47"`, horário de Brasília) | Bronze guarda como veio; a Etapa 03 aplica `America/Sao_Paulo` |
 | Valores como **número JSON** (`200733.6`) | Bronze guarda como veio; a Etapa 03 converte para `Decimal` |

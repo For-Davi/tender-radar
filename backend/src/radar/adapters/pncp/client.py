@@ -2,7 +2,9 @@
 
 Peculiaridades da API, verificadas em chamadas reais (ver docs/pncp-api.md):
 - `codigoModalidadeContratacao` é obrigatório na consulta de publicações;
-- `tamanhoPagina` vai no máximo até 50;
+- `tamanhoPagina` vai no máximo até 50 na consulta de publicações;
+- itens, resultados e arquivos também paginam (padrão de 10 por página!), mas aceitam
+  páginas grandes: sem paginar, uma contratação com 11 itens vinha com 10;
 - página além da última e listas vazias respondem 204, sem corpo;
 - o download do edital responde `application/octet-stream`, às vezes com redirect.
 """
@@ -43,7 +45,9 @@ from radar.ports.contratacoes_source import (
     SourceUnavailableError,
 )
 
-PAGE_SIZE = 50  # máximo aceito pelo PNCP
+PAGE_SIZE = 50  # máximo aceito pelo PNCP na consulta de publicações
+# a API de detalhes é lenta (até ~30 s por chamada): páginas grandes = poucas chamadas
+DETAIL_PAGE_SIZE = 500
 _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 _MAX_RETRY_AFTER_SECONDS = 60.0
 
@@ -83,6 +87,7 @@ class PncpClient:
         max_attempts: int,
         min_interval_seconds: float,
         max_download_bytes: int,
+        detail_page_size: int = DETAIL_PAGE_SIZE,
         sleep: Callable[[float], None] = time.sleep,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -92,6 +97,7 @@ class PncpClient:
         self._max_attempts = max_attempts
         self._min_interval = min_interval_seconds
         self._max_download_bytes = max_download_bytes
+        self._detail_page_size = detail_page_size
         # sleep e monotonic injetáveis: os testes controlam o tempo sem esperar de verdade
         self._sleep = sleep
         self._monotonic = monotonic
@@ -157,13 +163,28 @@ class PncpClient:
         return self._with_retry(url, lambda: self._request_once(url, params))
 
     def _get_list(self, url: str) -> list[JsonDict]:
-        response = self._get(url)
-        if response.status_code == httpx.codes.NO_CONTENT:
-            return []
-        body = self._json(response)
-        if not isinstance(body, list):
-            raise SourceSchemaError(f"resposta inesperada de {url}: esperava lista JSON")
-        return body
+        """Lê todas as páginas de uma lista da API de detalhes.
+
+        Estas rotas não dizem quantas páginas faltam: uma página incompleta (ou 204)
+        indica que acabou.
+        """
+        records: list[JsonDict] = []
+        pagina = 1
+        while True:
+            params: dict[str, str | int] = {
+                "pagina": pagina,
+                "tamanhoPagina": self._detail_page_size,
+            }
+            response = self._get(url, params)
+            if response.status_code == httpx.codes.NO_CONTENT:
+                return records
+            body = self._json(response)
+            if not isinstance(body, list):
+                raise SourceSchemaError(f"resposta inesperada de {url}: esperava lista JSON")
+            records.extend(body)
+            if len(body) < self._detail_page_size:
+                return records
+            pagina += 1
 
     def _with_retry(self, url: str, attempt: Callable[[], _T]) -> _T:
         retrying = Retrying(

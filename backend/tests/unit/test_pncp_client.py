@@ -216,6 +216,83 @@ def test_no_results_returns_empty(client: PncpClient) -> None:
     assert _list(client) == []
 
 
+def _small_page_client(http: httpx.Client) -> PncpClient:
+    """Cliente com página de 2 registros: simula listas longas com poucos dados."""
+    return PncpClient(
+        http,
+        consulta_url=CONSULTA,
+        api_url=API,
+        max_attempts=1,
+        min_interval_seconds=0.0,
+        max_download_bytes=1000,
+        detail_page_size=2,
+    )
+
+
+def _paged(records: list[Any]) -> Any:
+    """Simula a API de detalhes: fatia a lista conforme `pagina`/`tamanhoPagina`; 204 no fim."""
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        pagina = int(request.url.params["pagina"])
+        tamanho = int(request.url.params["tamanhoPagina"])
+        chunk = records[(pagina - 1) * tamanho : pagina * tamanho]
+        return httpx.Response(200, json=chunk) if chunk else httpx.Response(204)
+
+    return respond
+
+
+@respx.mock
+def test_items_walk_all_pages() -> None:
+    # bug encontrado com dados reais: sem paginar, o PNCP devolve só os 10 primeiros itens
+    itens = _fixture("itens.json")  # 3 itens
+    route = respx.get(f"{COMPRA}/itens").mock(side_effect=_paged(itens))
+
+    with httpx.Client() as http:
+        result = _small_page_client(http).get_itens(REF)
+
+    assert [i.numero_item for i in result] == [1, 2, 3]
+    # página 1 cheia (2) -> pede a 2; página 2 incompleta (1) -> para
+    assert route.call_count == 2
+
+
+@respx.mock
+def test_detail_pagination_stops_on_204_after_full_page() -> None:
+    arquivos = [
+        _fixture("arquivos.json")[0] | {"sequencialDocumento": n, "tipoDocumentoId": 16}
+        for n in (1, 2)
+    ]
+    route = respx.get(f"{COMPRA}/arquivos").mock(side_effect=_paged(arquivos))
+
+    with httpx.Client() as http:
+        result = _small_page_client(http).get_documentos(REF)
+
+    assert [d.sequencial_documento for d in result] == [1, 2]
+    assert route.call_count == 2  # a página 2 volta 204
+
+
+@respx.mock
+def test_results_are_paginated_too() -> None:
+    resultado = _fixture("resultados.json")[0]
+    resultados = [resultado | {"sequencialResultado": n} for n in (1, 2, 3)]
+    respx.get(f"{COMPRA}/itens/1/resultados").mock(side_effect=_paged(resultados))
+
+    with httpx.Client() as http:
+        result = _small_page_client(http).get_resultados(REF, 1)
+
+    assert [r["sequencialResultado"] for r in result] == [1, 2, 3]
+
+
+@respx.mock
+def test_detail_requests_use_large_default_page(client: PncpClient) -> None:
+    route = respx.get(f"{COMPRA}/itens").respond(json=_fixture("itens.json"))
+
+    client.get_itens(REF)
+
+    params = route.calls[0].request.url.params
+    assert params["pagina"] == "1"
+    assert params["tamanhoPagina"] == "500"  # API lenta: poucas chamadas grandes
+
+
 # ------------------------------------------------------------------ retry
 
 
