@@ -1,0 +1,222 @@
+version: 2
+
+models:
+  # ------------------------------------------------------------------ dimensões
+  - name: dim_orgao
+    description: Dimensão órgão (quem compra). 1 linha por CNPJ.
+    columns:
+      - name: orgao_key
+        data_tests: [unique, not_null]
+      - name: cnpj
+        data_tests: [unique, not_null]
+
+  - name: dim_fornecedor
+    description: Dimensão fornecedor (quem venceu itens). 1 linha por documento.
+    columns:
+      - name: fornecedor_key
+        data_tests: [unique, not_null]
+
+  - name: dim_categoria
+    description: Dimensão categoria = tipo (material/serviço) + capítulo do NCM.
+    columns:
+      - name: categoria_key
+        data_tests: [unique, not_null]
+      - name: categoria_nome
+        data_tests: [not_null]
+      - name: material_ou_servico
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["M", "S"]
+
+  - name: dim_tempo
+    description: Dimensão tempo, 1 linha por dia de 2021 até o fim do ano que vem.
+    columns:
+      - name: data
+        data_tests: [unique, not_null]
+      - name: ano_mes
+        data_tests: [not_null]
+
+  # ------------------------------------------------------------------ fato
+  - name: fato_contratacao_item
+    description: >
+      Fato central. GRÃO: 1 linha por item de contratação. Medidas: quantidade e
+      valores; chaves para órgão, fornecedor (nula sem vencedor), categoria e tempo.
+    columns:
+      - name: item_key
+        data_tests: [unique, not_null]
+      - name: orgao_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_orgao')
+                field: orgao_key
+      - name: fornecedor_key
+        description: Nula quando o item ainda não tem vencedor (o teste ignora nulos).
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_fornecedor')
+                field: fornecedor_key
+      - name: categoria_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_categoria')
+                field: categoria_key
+      - name: data_publicacao
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_tempo')
+                field: data
+      - name: modalidade
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+                quote: false
+      - name: uf
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG",
+                         "MS", "MT", "PA", "PB", "PE", "PI", "PR", "RJ", "RN", "RO", "RR",
+                         "RS", "SC", "SE", "SP", "TO"]
+      - name: quantidade
+        data_tests: [not_null]
+
+  # ------------------------------------------------------------------ marts
+  - name: mart_preco_categoria_mensal
+    description: Preço mediano por categoria e unidade, mês a mês, com variação (LAG).
+    columns:
+      - name: preco_mediano
+        data_tests: [not_null]
+
+  - name: mart_ranking_fornecedor_orgao
+    description: Ranking dos fornecedores de cada órgão por valor homologado (RANK).
+    columns:
+      - name: ranking
+        data_tests: [not_null]
+
+  - name: mart_valor_contratado_mensal
+    description: Valor estimado por mês (série sem buracos) com média móvel de 3 meses.
+    columns:
+      - name: mes
+        data_tests: [unique, not_null]
+
+  - name: mart_percentil_preco_item
+    description: Percentil do preço de cada item entre os comparáveis (PERCENT_RANK).
+    columns:
+      - name: item_key
+        data_tests: [unique, not_null]
+
+# ---------------------------------------------------------------------------------
+# Unit tests: entrada e saída escritas à mão. Rodam antes de construir o modelo e
+# não dependem dos dados reais. Só as colunas listadas no "expect" são conferidas.
+# ---------------------------------------------------------------------------------
+unit_tests:
+  - name: preco_mensal_variacao_so_contra_o_mes_imediatamente_anterior
+    description: >
+      Jan (mediana 15) -> fev (16,5) = +10%. Março sem itens: abril NÃO compara com
+      fevereiro (variação nula). Unidades e categorias diferentes são partições separadas.
+      Item sigiloso (preço nulo) não entra.
+    model: mart_preco_categoria_mensal
+    given:
+      - input: ref('fato_contratacao_item')
+        rows:
+          - {categoria_key: A, unidade_normalizada: UNIDADE, data_publicacao: 2026-01-10, valor_unitario_estimado: 10}
+          - {categoria_key: A, unidade_normalizada: UNIDADE, data_publicacao: 2026-01-20, valor_unitario_estimado: 20}
+          - {categoria_key: A, unidade_normalizada: UNIDADE, data_publicacao: 2026-01-25, valor_unitario_estimado: null}
+          - {categoria_key: A, unidade_normalizada: UNIDADE, data_publicacao: 2026-02-05, valor_unitario_estimado: 16.5}
+          - {categoria_key: A, unidade_normalizada: UNIDADE, data_publicacao: 2026-04-01, valor_unitario_estimado: 12}
+          - {categoria_key: A, unidade_normalizada: CAIXA, data_publicacao: 2026-02-01, valor_unitario_estimado: 50}
+          - {categoria_key: B, unidade_normalizada: UNIDADE, data_publicacao: 2026-02-01, valor_unitario_estimado: 100}
+    expect:
+      rows:
+        - {categoria_key: A, unidade_normalizada: UNIDADE, mes: 2026-01-01, itens: 2, preco_mediano: 15, preco_mediano_mes_anterior: null, variacao_percentual: null}
+        - {categoria_key: A, unidade_normalizada: UNIDADE, mes: 2026-02-01, itens: 1, preco_mediano: 16.5, preco_mediano_mes_anterior: "15.0000", variacao_percentual: "10.00"}
+        - {categoria_key: A, unidade_normalizada: UNIDADE, mes: 2026-04-01, itens: 1, preco_mediano: 12, preco_mediano_mes_anterior: null, variacao_percentual: null}
+        - {categoria_key: A, unidade_normalizada: CAIXA, mes: 2026-02-01, itens: 1, preco_mediano: 50, preco_mediano_mes_anterior: null, variacao_percentual: null}
+        - {categoria_key: B, unidade_normalizada: UNIDADE, mes: 2026-02-01, itens: 1, preco_mediano: 100, preco_mediano_mes_anterior: null, variacao_percentual: null}
+
+  - name: media_movel_conta_mes_vazio_como_zero
+    description: >
+      Jan 300, fev sem contratações, mar 600, abr 300. A média de abril é
+      (0 + 600 + 300) / 3 = 300. Sem preencher fevereiro, seria (300 + 600 + 300) / 3 = 400.
+    model: mart_valor_contratado_mensal
+    given:
+      - input: ref('fato_contratacao_item')
+        rows:
+          - {numero_controle_pncp: X, data_publicacao: 2026-01-05, valor_total_estimado: 100}
+          - {numero_controle_pncp: X, data_publicacao: 2026-01-05, valor_total_estimado: 200}
+          - {numero_controle_pncp: Y, data_publicacao: 2026-03-15, valor_total_estimado: 600}
+          - {numero_controle_pncp: Z, data_publicacao: 2026-04-30, valor_total_estimado: 300}
+      - input: ref('dim_tempo')
+        rows:
+          - {ano_mes: 2025-12-01}
+          - {ano_mes: 2026-01-01}
+          - {ano_mes: 2026-02-01}
+          - {ano_mes: 2026-03-01}
+          - {ano_mes: 2026-04-01}
+          - {ano_mes: 2026-05-01}
+    expect:
+      rows:
+        - {mes: 2026-01-01, contratacoes: 1, itens: 2, valor_total_estimado: 300, media_movel_3m: "300.00", meses_na_media: 1}
+        - {mes: 2026-02-01, contratacoes: 0, itens: 0, valor_total_estimado: 0, media_movel_3m: "150.00", meses_na_media: 2}
+        - {mes: 2026-03-01, contratacoes: 1, itens: 1, valor_total_estimado: 600, media_movel_3m: "300.00", meses_na_media: 3}
+        - {mes: 2026-04-01, contratacoes: 1, itens: 1, valor_total_estimado: 300, media_movel_3m: "300.00", meses_na_media: 3}
+
+  - name: ranking_com_empate_pula_posicao
+    description: >
+      No órgão O1, F1 e F2 empatam com 1000 (posição 1) e F3 fica em 3º (RANK pula o 2).
+      Item sem vencedor não entra. Cada órgão tem seu próprio ranking.
+    model: mart_ranking_fornecedor_orgao
+    given:
+      - input: ref('fato_contratacao_item')
+        rows:
+          - {orgao_key: O1, fornecedor_key: F1, valor_total_homologado: 600}
+          - {orgao_key: O1, fornecedor_key: F1, valor_total_homologado: 400}
+          - {orgao_key: O1, fornecedor_key: F2, valor_total_homologado: 1000}
+          - {orgao_key: O1, fornecedor_key: F3, valor_total_homologado: 500}
+          - {orgao_key: O1, fornecedor_key: null, valor_total_homologado: null}
+          - {orgao_key: O2, fornecedor_key: F1, valor_total_homologado: 50}
+    expect:
+      rows:
+        - {orgao_key: O1, fornecedor_key: F1, itens_vencidos: 2, valor_total_homologado: 1000, ranking: 1, participacao_percentual: "40.00"}
+        - {orgao_key: O1, fornecedor_key: F2, itens_vencidos: 1, valor_total_homologado: 1000, ranking: 1, participacao_percentual: "40.00"}
+        - {orgao_key: O1, fornecedor_key: F3, itens_vencidos: 1, valor_total_homologado: 500, ranking: 3, participacao_percentual: "20.00"}
+        - {orgao_key: O2, fornecedor_key: F1, itens_vencidos: 1, valor_total_homologado: 50, ranking: 1, participacao_percentual: "100.00"}
+
+  - name: percentil_por_grupo_comparavel_e_amostra_minima
+    description: >
+      5 itens de A/UNIDADE (10..50) viram percentis 0; 0,25; 0,5; 0,75; 1 e só o de 50
+      fica acima do p90. A/CAIXA sozinho tem percentil 0. Em B só há 2 itens: o mais caro
+      tem percentil 1, mas não gera alerta (amostra mínima = 5). Sigiloso não entra.
+    model: mart_percentil_preco_item
+    given:
+      - input: ref('fato_contratacao_item')
+        rows:
+          - {item_key: a1, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: 30}
+          - {item_key: a2, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: 10}
+          - {item_key: a3, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: 50}
+          - {item_key: a4, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: 20}
+          - {item_key: a5, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: 40}
+          - {item_key: a6, categoria_key: A, unidade_normalizada: UNIDADE, valor_unitario_estimado: null}
+          - {item_key: c1, categoria_key: A, unidade_normalizada: CAIXA, valor_unitario_estimado: 99}
+          - {item_key: b1, categoria_key: B, unidade_normalizada: UNIDADE, valor_unitario_estimado: 1}
+          - {item_key: b2, categoria_key: B, unidade_normalizada: UNIDADE, valor_unitario_estimado: 1000}
+    expect:
+      rows:
+        - {item_key: a2, percentil_preco: "0.0000", itens_comparaveis: 5, acima_p90: false}
+        - {item_key: a4, percentil_preco: "0.2500", itens_comparaveis: 5, acima_p90: false}
+        - {item_key: a1, percentil_preco: "0.5000", itens_comparaveis: 5, acima_p90: false}
+        - {item_key: a5, percentil_preco: "0.7500", itens_comparaveis: 5, acima_p90: false}
+        - {item_key: a3, percentil_preco: "1.0000", itens_comparaveis: 5, acima_p90: true}
+        - {item_key: c1, percentil_preco: "0.0000", itens_comparaveis: 1, acima_p90: false}
+        - {item_key: b1, percentil_preco: "0.0000", itens_comparaveis: 2, acima_p90: false}
+        - {item_key: b2, percentil_preco: "1.0000", itens_comparaveis: 2, acima_p90: false}
