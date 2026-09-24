@@ -32,6 +32,7 @@ UFS = frozenset(
 )
 
 # CNPJ do órgão - 1 (tipo "contratação") - sequencial com 6 dígitos / ano
+_NCM_NBS = re.compile(r"\d{2,9}")
 _NUMERO_CONTROLE = re.compile(r"^(?P<cnpj>[0-9A-Z]{12}\d{2})-1-(?P<seq>\d{6})/(?P<ano>\d{4})$")
 
 
@@ -95,10 +96,14 @@ class ItemContratacao:
     valor_unitario_estimado: Dinheiro | None
     fornecedor_documento: str | None = None
     valor_unitario_homologado: Dinheiro | None = None
+    # classificação: NCM (mercadoria) ou NBS (serviço), só dígitos; base da categoria no dbt
+    ncm_nbs: str | None = None
 
     def __post_init__(self) -> None:
         if self.numero_item < 1:
             raise BusinessRuleError(f"numero_item deve ser >= 1: {self.numero_item}")
+        if self.ncm_nbs is not None and not _NCM_NBS.fullmatch(self.ncm_nbs):
+            raise InvalidValueError(f"código NCM/NBS inválido: {self.ncm_nbs!r}")
         object.__setattr__(self, "descricao", _required_text(self.descricao, "descricao"))
         quantidade = to_decimal(self.quantidade, "quantidade")
         if quantidade <= 0:

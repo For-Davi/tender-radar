@@ -6,6 +6,7 @@ devolve o valor limpo, ou levanta `ValueError` com uma mensagem clara. Levantar
 validação que aponta o campo (ver `schemas_bronze.py`).
 """
 
+import re
 import unicodedata
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -16,6 +17,9 @@ BRASILIA = ZoneInfo("America/Sao_Paulo")
 
 # valores que aparecem no lugar de "não tem categoria" (comparados sem acento/caixa)
 _PLACEHOLDERS_CATEGORIA = frozenset({"nao se aplica", "-", "n/a"})
+
+# NCM (8 dígitos), NBS (9) ou só o início do código (capítulo = 2 dígitos)
+_NCM = re.compile(r"\d{2,9}")
 
 
 # ------------------------------------------------------------------ números
@@ -112,6 +116,22 @@ def normalizar_categoria(valor: object) -> str | None:
     if texto is None or _sem_acento(texto.casefold()) in _PLACEHOLDERS_CATEGORIA:
         return None
     return texto
+
+
+def normalizar_ncm(valor: object) -> str | None:
+    """Código NCM (mercadoria, 8 dígitos) ou NBS (serviço, 9), sem máscara.
+
+    Aceita só o capítulo (2 dígitos), que aparece nos dados reais. Inválido vira None:
+    é um campo opcional de classificação, não vale rejeitar o item por ele.
+    """
+    if isinstance(valor, bool):
+        return None
+    if isinstance(valor, int):
+        valor = str(valor)
+    if not isinstance(valor, str):
+        return None
+    codigo = valor.replace(".", "").replace(" ", "")
+    return codigo if _NCM.fullmatch(codigo) else None
 
 
 def _sem_acento(texto: str) -> str:

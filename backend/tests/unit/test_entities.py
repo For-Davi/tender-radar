@@ -285,3 +285,10 @@ def test_contratacao_with_all_fields() -> None:
     )
 
     assert contratacao.valor_total_itens() == Dinheiro.de("50000")
+
+
+def test_item_ncm_is_optional_and_validated() -> None:
+    assert make_item().ncm_nbs is None
+    assert make_item(ncm_nbs="90183999").ncm_nbs == "90183999"
+    with pytest.raises(InvalidValueError, match="NCM"):
+        make_item(ncm_nbs="90.18")

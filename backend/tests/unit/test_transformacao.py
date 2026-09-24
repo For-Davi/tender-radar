@@ -378,3 +378,27 @@ def test_same_supplier_in_many_items_appears_once() -> None:
 
     assert result.limpa is not None
     assert len(result.limpa.fornecedores) == 1
+
+
+# ------------------------------------------------------------------ NCM/NBS
+
+
+def test_ncm_is_cleaned() -> None:
+    payload = fixture_payload()
+    payload["itens"][0]["ncmNbsCodigo"] = "9018.39.99"
+
+    result = _run(payload)
+
+    assert result.limpa is not None
+    assert result.limpa.contratacao.itens[0].ncm_nbs == "90183999"
+
+
+def test_invalid_ncm_is_dropped_without_rejecting_the_item() -> None:
+    payload = fixture_payload()
+    payload["itens"][0]["ncmNbsCodigo"] = "não informado"
+
+    result = _run(payload)
+
+    assert result.rejeicoes == ()
+    assert result.limpa is not None
+    assert result.limpa.contratacao.itens[0].ncm_nbs is None

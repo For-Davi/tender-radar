@@ -244,6 +244,7 @@ class _Transformador:
                 valor_unitario_estimado=self._valor_estimado(item),
                 fornecedor_documento=fornecedor.documento if fornecedor else None,
                 valor_unitario_homologado=homologado,
+                ncm_nbs=item.ncm_nbs,
             )
         except DomainError as exc:
             raise _dominio(exc, campo) from exc

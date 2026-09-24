@@ -25,6 +25,7 @@ from radar.domain.enums import (
 )
 from radar.pipelines.normalizacao import (
     normalizar_categoria,
+    normalizar_ncm,
     normalizar_texto,
     para_datetime,
     para_decimal,
@@ -39,6 +40,7 @@ Categoria = Annotated[str | None, BeforeValidator(normalizar_categoria)]
 Valor = Annotated[Decimal, BeforeValidator(para_decimal)]
 ValorOpcional = Annotated[Decimal | None, BeforeValidator(para_decimal_opcional)]
 DataHora = Annotated[datetime, BeforeValidator(para_datetime)]
+CodigoNcm = Annotated[str | None, BeforeValidator(normalizar_ncm)]
 
 
 class _Bruto(BaseModel):
@@ -77,6 +79,7 @@ class ItemBronze(_Bruto):
     unidade_medida: Texto = Field(alias="unidadeMedida")
     valor_unitario_estimado: ValorOpcional = Field(alias="valorUnitarioEstimado", default=None)
     orcamento_sigiloso: bool = Field(alias="orcamentoSigiloso", default=False)
+    ncm_nbs: CodigoNcm = Field(alias="ncmNbsCodigo", default=None)
 
 
 class ResultadoBronze(_Bruto):

@@ -8,6 +8,7 @@ import pytest
 from radar.pipelines.normalizacao import (
     BRASILIA,
     normalizar_categoria,
+    normalizar_ncm,
     normalizar_texto,
     para_datetime,
     para_decimal,
@@ -123,3 +124,26 @@ def test_categoria_placeholders_become_none(placeholder: str) -> None:
 
 def test_categoria_real_is_kept() -> None:
     assert normalizar_categoria("  Material de  consumo ") == "Material de consumo"
+
+
+# ------------------------------------------------------------------ NCM/NBS
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("90183999", "90183999"),
+        ("9018.39.99", "90183999"),  # com máscara
+        (" 90 ", "90"),  # só o capítulo (visto em dados reais)
+        (30049069, "30049069"),  # número JSON
+        ("123456789", "123456789"),  # NBS (serviços) tem 9 dígitos
+    ],
+)
+def test_normalizar_ncm_accepts_codes(raw: object, expected: str) -> None:
+    assert normalizar_ncm(raw) == expected
+
+
+@pytest.mark.parametrize("raw", [None, "", "  ", "abc", "9", "1234567890", "90.1a", True])
+def test_normalizar_ncm_discards_invalid(raw: object) -> None:
+    # campo opcional de classificação: inválido vira None, sem rejeitar o item
+    assert normalizar_ncm(raw) is None

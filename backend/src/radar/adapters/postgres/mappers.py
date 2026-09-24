@@ -104,6 +104,7 @@ def item_values(item: ItemContratacao, contratacao_id: int, fornecedor_id: int |
         "valor_unitario_estimado": _money_or_none(item.valor_unitario_estimado),
         "fornecedor_id": fornecedor_id,
         "valor_unitario_homologado": _money_or_none(item.valor_unitario_homologado),
+        "ncm_nbs": item.ncm_nbs,
     }
 
 
@@ -118,6 +119,7 @@ def item_to_domain(model: ItemContratacaoModel) -> ItemContratacao:
         valor_unitario_estimado=_dinheiro_or_none(model.valor_unitario_estimado),
         fornecedor_documento=model.fornecedor.documento if model.fornecedor else None,
         valor_unitario_homologado=_dinheiro_or_none(model.valor_unitario_homologado),
+        ncm_nbs=model.ncm_nbs,
     )
 
 

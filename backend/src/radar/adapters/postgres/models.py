@@ -160,6 +160,8 @@ class ItemContratacaoModel(_AuditMixin, Base):
     valor_unitario_estimado: Mapped[Decimal | None] = mapped_column(Money)
     fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey(FornecedorModel.id), index=True)
     valor_unitario_homologado: Mapped[Decimal | None] = mapped_column(Money)
+    # NCM (8 dígitos) ou NBS (9); pode ser só o capítulo (2). Base da categoria no dbt
+    ncm_nbs: Mapped[str | None] = mapped_column(String(9))
 
     fornecedor: Mapped[FornecedorModel | None] = relationship(lazy="raise")
 

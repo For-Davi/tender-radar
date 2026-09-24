@@ -112,6 +112,19 @@ def test_values_are_exact_and_dates_have_timezone(
     assert contratacao.data_publicacao == datetime(2025, 3, 10, 10, 15, 44, tzinfo=UTC)
 
 
+def test_ncm_is_stored_clean(bronze: MongoBronzeRepository, session: Session) -> None:
+    payload = payload_with_numero(1)
+    payload["itens"][0]["ncmNbsCodigo"] = "9018.39.99"
+    _save(bronze, payload, T0)
+
+    _run(bronze, session, T0 + timedelta(hours=1))
+
+    ncms = session.scalars(
+        select(ItemContratacaoModel.ncm_nbs).order_by(ItemContratacaoModel.numero_item)
+    ).all()
+    assert ncms == ["90183999", None, None]
+
+
 def test_sigiloso_is_stored_as_null(bronze: MongoBronzeRepository, session: Session) -> None:
     payload = payload_with_numero(1)
     payload["itens"][0] |= {"orcamentoSigiloso": True, "valorUnitarioEstimado": 0}
