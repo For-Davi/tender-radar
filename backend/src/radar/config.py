@@ -6,14 +6,22 @@ em maiúsculas (ex.: `log_level` <- `LOG_LEVEL`). Valores inválidos geram um
 aplicação nem subir do que rodar com configuração errada.
 """
 
-from typing import Literal
+from pathlib import Path
+from typing import Annotated, Literal
 from urllib.parse import quote
 
 from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+from radar.domain.entities import UFS
+from radar.domain.enums import Modalidade
 
 Environment = Literal["dev", "test", "prod"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+
+# NoDecode: a lista vem do ambiente como texto "CE,SP" (e não como JSON); o validator divide
+CommaList = Annotated[list[str], NoDecode]
+CommaIntList = Annotated[list[int], NoDecode]
 
 
 class Settings(BaseSettings):
@@ -33,11 +41,75 @@ class Settings(BaseSettings):
     postgres_password: SecretStr = SecretStr("radar")  # SecretStr esconde o valor em logs/repr
     postgres_db: str = "radar"
 
+    # ---------- MongoDB (camada bronze) ----------
+    mongo_host: str = "localhost"
+    mongo_port: int = Field(default=27017, ge=1, le=65535)
+    # o mesmo usuário que a imagem do Mongo cria (MONGO_ROOT_*); em produção, um usuário só da app
+    mongo_root_user: str = "radar"
+    mongo_root_password: SecretStr = SecretStr("radar")
+    mongo_db: str = "radar_bronze"
+
+    # ---------- RabbitMQ ----------
+    rabbitmq_host: str = "localhost"
+    rabbitmq_port: int = Field(default=5672, ge=1, le=65535)
+    rabbitmq_user: str = "radar"
+    rabbitmq_password: SecretStr = SecretStr("radar")
+
+    # ---------- API do PNCP ----------
+    pncp_consulta_url: str = "https://pncp.gov.br/api/consulta"
+    pncp_api_url: str = "https://pncp.gov.br/api/pncp"
+    pncp_timeout_seconds: float = Field(default=30.0, gt=0)
+    pncp_max_attempts: int = Field(default=5, ge=1)
+    pncp_min_interval_seconds: float = Field(default=0.2, ge=0)
+
+    # ---------- Ingestão ----------
+    ingestao_ufs: CommaList = ["CE"]
+    ingestao_modalidades: CommaIntList = [6, 8]  # pregão eletrônico e dispensa
+    ingestao_janela_dias: int = Field(default=2, ge=1)
+    ingestao_intervalo_minutos: int = Field(default=60, ge=1)
+    storage_dir: Path = Path("storage/editais")
+    documento_max_bytes: int = Field(default=30 * 1024 * 1024, ge=1)
+
+    @field_validator("ingestao_ufs", mode="before")
+    @classmethod
+    def _parse_ufs(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = [uf.strip().upper() for uf in value.split(",") if uf.strip()]
+        if isinstance(value, list):
+            if not value:
+                raise ValueError("informe ao menos uma UF")
+            invalid = [uf for uf in value if uf not in UFS]
+            if invalid:
+                raise ValueError(f"UF(s) inválida(s): {invalid}")
+        return value
+
+    @field_validator("ingestao_modalidades", mode="before")
+    @classmethod
+    def _parse_modalidades(cls, value: object) -> object:
+        if isinstance(value, str):
+            try:
+                value = [int(code) for code in value.split(",") if code.strip()]
+            except ValueError as exc:
+                raise ValueError(f"modalidades devem ser códigos numéricos: {value!r}") from exc
+        if isinstance(value, list):
+            valid = {m.value for m in Modalidade}
+            invalid = [code for code in value if code not in valid]
+            if not value or invalid:
+                raise ValueError(f"modalidade(s) inválida(s): {invalid or value}")
+        return value
+
     @field_validator("log_level", mode="before")
     @classmethod
     def _normalize_log_level(cls, value: object) -> object:
         """Aceita `info`, `Info` etc.; a validação do Literal acontece depois."""
         return value.upper() if isinstance(value, str) else value
+
+    @property
+    def mongo_url(self) -> str:
+        user = quote(self.mongo_root_user, safe="")
+        password = quote(self.mongo_root_password.get_secret_value(), safe="")
+        # authSource=admin: o usuário root é criado no banco "admin"
+        return f"mongodb://{user}:{password}@{self.mongo_host}:{self.mongo_port}/?authSource=admin"
 
     @property
     def postgres_dsn(self) -> str:
