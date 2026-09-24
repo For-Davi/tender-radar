@@ -90,6 +90,17 @@ def test_item_flagged_with_result_but_without_results_has_no_result() -> None:
     assert result.rejeicoes == ()
 
 
+def test_orgao_without_esfera_is_accepted() -> None:
+    # dado real (consórcio público de saúde de Iguatu-CE): esferaId "N" = não se aplica
+    payload = fixture_payload()
+    payload["contratacao"]["orgaoEntidade"]["esferaId"] = "N"
+
+    result = _run(payload)
+
+    assert result.limpa is not None
+    assert result.limpa.orgao.esfera is Esfera.NAO_SE_APLICA
+
+
 def test_masked_cnpj_is_normalized() -> None:
     payload = fixture_payload()
     payload["contratacao"]["orgaoEntidade"]["cnpj"] = "07.954.480/0001-79"

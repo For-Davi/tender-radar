@@ -127,6 +127,18 @@ def test_sigiloso_is_stored_as_null(bronze: MongoBronzeRepository, session: Sess
     assert estimado is None
 
 
+def test_orgao_without_esfera_is_saved(bronze: MongoBronzeRepository, session: Session) -> None:
+    # dado real: consórcio público com esferaId "N" (o CHECK da 0001 só aceitava F/E/M/D)
+    payload = payload_with_numero(1)
+    payload["contratacao"]["orgaoEntidade"]["esferaId"] = "N"
+    _save(bronze, payload, T0)
+
+    report = _run(bronze, session, T0 + timedelta(hours=1))
+
+    assert report.gravadas == 1
+    assert session.scalar(select(OrgaoModel.esfera)) == "N"
+
+
 def test_second_run_reads_nothing_and_full_rerun_does_not_duplicate(
     bronze: MongoBronzeRepository, session: Session
 ) -> None:

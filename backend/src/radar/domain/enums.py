@@ -47,6 +47,8 @@ class Esfera(StrEnum):
     ESTADUAL = "E"
     MUNICIPAL = "M"
     DISTRITAL = "D"
+    # visto em dados reais: consórcios públicos (ex.: consórcio de saúde de Iguatu-CE)
+    NAO_SE_APLICA = "N"
 
 
 class Poder(StrEnum):
