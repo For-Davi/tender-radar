@@ -28,6 +28,9 @@ RUN useradd --create-home --uid 1000 appuser
 
 WORKDIR /app
 COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
+# migrações: usadas pelo serviço "migrate" do docker-compose (alembic upgrade head)
+COPY --chown=appuser:appuser alembic.ini ./
+COPY --chown=appuser:appuser alembic ./alembic
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 
 # nunca rodar como root (comentário em linha própria: o Docker não aceita comentário no fim da instrução)

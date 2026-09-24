@@ -7,6 +7,18 @@
 
 name: radar
 
+# Configuração comum da imagem do backend (API e migrate usam a mesma imagem)
+x-backend: &backend
+  build:
+    context: ./backend
+  image: radar-backend
+  env_file:
+    - path: .env
+      required: false                        # sem .env, valem os padrões de config.py
+  environment:
+    POSTGRES_HOST: postgres                  # sobrescreve o "localhost" do .env
+    LOG_JSON: "true"
+
 services:
   # ---------- Infraestrutura ----------
   postgres:
@@ -52,17 +64,19 @@ services:
       retries: 10
 
   # ---------- Aplicação ----------
+  migrate:
+    <<: *backend
+    # roda uma vez e termina: aplica as migrações pendentes do Alembic
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+
   api:
-    build:
-      context: ./backend
-    env_file:
-      - path: .env
-        required: false                      # sem .env, valem os padrões de config.py
-    environment:
-      POSTGRES_HOST: postgres                # sobrescreve o "localhost" do .env
-      LOG_JSON: "true"
+    <<: *backend
     ports: ["127.0.0.1:8000:8000"]
     depends_on:
+      migrate: { condition: service_completed_successfully }   # banco sempre atualizado
       postgres: { condition: service_healthy }
       mongo: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }

@@ -7,4 +7,3 @@
 .coverage
 htmlcov/
 tests/
-alembic/
