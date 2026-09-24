@@ -1,0 +1,10 @@
+# Tudo que não precisa ir para a imagem (build mais rápido e imagem menor)
+.venv/
+**/__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tests/
+alembic/

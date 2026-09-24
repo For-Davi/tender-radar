@@ -1,0 +1,81 @@
+# Radar de Licitações — stack local
+# Uso: make up   (equivale a: cp .env.example .env && docker compose up -d --build --wait)
+#
+# Na rede interna do Compose, o NOME DO SERVIÇO é o hostname: a API acessa o
+# Postgres em "postgres:5432", não em "localhost".
+# As portas publicadas ficam presas a 127.0.0.1: acessíveis só desta máquina.
+
+name: radar
+
+services:
+  # ---------- Infraestrutura ----------
+  postgres:
+    image: pgvector/pgvector:pg16            # Postgres 16 + extensão pgvector
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-radar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-radar}
+      POSTGRES_DB: ${POSTGRES_DB:-radar}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-radar} -d ${POSTGRES_DB:-radar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7                           # camada bronze: JSON bruto do PNCP
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-radar}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-radar}
+    ports: ["127.0.0.1:27017:27017"]
+    volumes: [mongo_data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management          # UI de gestão em http://localhost:15672
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-radar}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-radar}
+    ports: ["127.0.0.1:5672:5672", "127.0.0.1:15672:15672"]
+    volumes: [rabbit_data:/var/lib/rabbitmq]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+
+  # ---------- Aplicação ----------
+  api:
+    build:
+      context: ./backend
+    env_file:
+      - path: .env
+        required: false                      # sem .env, valem os padrões de config.py
+    environment:
+      POSTGRES_HOST: postgres                # sobrescreve o "localhost" do .env
+      LOG_JSON: "true"
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      # a imagem não tem curl; o próprio Python faz a requisição (urlopen falha se não for 2xx)
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  pg_data:
+  mongo_data:
+  rabbit_data:
