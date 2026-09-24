@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0                # este repo não publica tag só com o major (v10)
         with:
           enable-cache: true                     # cache dos pacotes baixados
           cache-dependency-glob: backend/uv.lock # o cache muda só quando o lock muda
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0                # este repo não publica tag só com o major (v10)
         with:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-24.04                        # o runner já tem Docker instalado
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0                # este repo não publica tag só com o major (v10)
         with:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
