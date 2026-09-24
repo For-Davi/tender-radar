@@ -14,14 +14,22 @@ Se o processo cair no meio, a marca não avança e a próxima execução relê o
 Isso é seguro porque tudo é idempotente (upsert pela chave natural, rejeição única).
 """
 
+import argparse
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Protocol
 
 import structlog
+from pymongo import MongoClient
 
+from radar.adapters.mongo.bronze import MongoBronzeRepository, MongoDoc
+from radar.adapters.postgres.database import create_db_engine, create_session_factory
+from radar.adapters.postgres.silver import SqlSilverUnitOfWork
+from radar.config import Settings
 from radar.domain.errors import DomainError
+from radar.logging_setup import configure_logging
 from radar.pipelines.transformacao import ContratacaoLimpa, transformar
 from radar.ports.bronze import BronzeReader, BronzeVersion
 from radar.ports.silver import MotivoRejeicao, Problema, Rejeicao, SilverUnitOfWork
@@ -135,3 +143,72 @@ class BronzeToSilverPipeline:
             problemas=[f"{p.campo}: {p.erro}" for p in rejeicao.problemas],
         )
         self._silver.rejeicoes.add(rejeicao)
+
+
+# ------------------------------------------------------------------ linha de comando
+# Raiz de composição: o único trecho deste módulo que conhece Mongo e Postgres.
+
+
+class PipelineRunner(Protocol):
+    def run(self, *, completo: bool = False) -> RelatorioPipeline: ...
+
+
+PipelineFactory = Callable[[Settings], tuple[PipelineRunner, Callable[[], None]]]
+
+
+def build_pipeline(settings: Settings) -> tuple[PipelineRunner, Callable[[], None]]:
+    """Cria o pipeline com as dependências reais e uma função que fecha as conexões."""
+    mongo: MongoClient[MongoDoc] = MongoClient(settings.mongo_url, tz_aware=True)
+    bronze = MongoBronzeRepository(mongo[settings.mongo_db])
+    bronze.ensure_indexes()  # garante o índice (e o backfill) de vigente_desde
+    engine = create_db_engine(settings)
+    session = create_session_factory(engine)()
+
+    def close() -> None:
+        session.close()
+        engine.dispose()
+        mongo.close()
+
+    return BronzeToSilverPipeline(bronze, SqlSilverUnitOfWork(session)), close
+
+
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    settings: Settings | None = None,
+    pipeline_factory: PipelineFactory = build_pipeline,
+) -> int:
+    settings = settings or Settings()
+    configure_logging(settings.log_level, json_output=settings.log_json)
+    parser = argparse.ArgumentParser(
+        prog="python -m radar.pipelines.bronze_to_silver",
+        description="Pipeline incremental bronze (MongoDB) -> silver (Postgres).",
+    )
+    parser.add_argument(
+        "--completo", action="store_true", help="ignora a marca d'água e reprocessa tudo"
+    )
+    args = parser.parse_args(argv)
+
+    pipeline, close = pipeline_factory(settings)
+    log.info("pipeline_iniciado", pipeline=PIPELINE, completo=args.completo)
+    try:
+        report = pipeline.run(completo=args.completo)
+    finally:
+        close()
+    log.info(
+        "pipeline_concluido",
+        pipeline=PIPELINE,
+        lidas=report.lidas,
+        gravadas=report.gravadas,
+        rejeitadas=report.rejeitadas,
+        itens_gravados=report.itens_gravados,
+        itens_rejeitados=report.itens_rejeitados,
+        inconsistentes=report.inconsistentes,
+        duracao_s=report.duracao_segundos,
+        marca=report.marca.isoformat() if report.marca else None,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

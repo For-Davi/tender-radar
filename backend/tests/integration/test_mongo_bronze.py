@@ -90,6 +90,80 @@ def test_indexes_are_created_idempotently(
     assert ("numero_controle_pncp", "hash") in unique_indexes
 
 
+# ------------------------------------------------------------------ vigente_desde e leitura
+
+
+def _vigente_desde(mongo_db: Database[MongoDoc], hash_: str) -> datetime:
+    doc = mongo_db[CONTRATACOES].find_one({"hash": hash_})
+    assert doc is not None
+    value: datetime = doc["vigente_desde"]
+    return value
+
+
+def test_new_version_sets_vigente_desde(
+    repo: MongoBronzeRepository, mongo_db: Database[MongoDoc]
+) -> None:
+    repo.save_if_changed(_record("h1", T0))
+
+    assert _vigente_desde(mongo_db, "h1") == T0
+
+
+def test_seeing_same_content_again_does_not_move_vigente_desde(
+    repo: MongoBronzeRepository, mongo_db: Database[MongoDoc]
+) -> None:
+    # senão o pipeline reprocessaria, a cada coleta, contratações que não mudaram
+    repo.save_if_changed(_record("h1", T0))
+    repo.save_if_changed(_record("h1", T0 + timedelta(hours=1)))
+
+    assert _vigente_desde(mongo_db, "h1") == T0
+
+
+def test_reverted_version_becomes_current_again(
+    repo: MongoBronzeRepository, mongo_db: Database[MongoDoc]
+) -> None:
+    # A -> B -> A: a volta para A é uma mudança que o pipeline precisa ver
+    repo.save_if_changed(_record("A", T0))
+    repo.save_if_changed(_record("B", T0 + timedelta(hours=1)))
+    repo.save_if_changed(_record("A", T0 + timedelta(hours=2)))
+
+    assert _vigente_desde(mongo_db, "A") == T0 + timedelta(hours=2)
+
+
+def test_versions_between_filters_and_orders(repo: MongoBronzeRepository) -> None:
+    repo.save_if_changed(_record("h1", T0))
+    repo.save_if_changed(_record("h2", T0 + timedelta(hours=1)))
+    repo.save_if_changed(_record("h3", T0 + timedelta(hours=2)))
+
+    # intervalo (depois_de, ate]: exclui o início, inclui o fim
+    result = list(repo.versions_between(T0, T0 + timedelta(hours=2)))
+
+    assert [v.hash for v in result] == ["h2", "h3"]
+    assert result[0].payload == {"conteudo": "h2"}
+    assert result[0].numero_controle_pncp == NUMERO
+    assert result[0].vigente_desde == T0 + timedelta(hours=1)
+
+
+def test_versions_between_without_start_reads_everything(repo: MongoBronzeRepository) -> None:
+    repo.save_if_changed(_record("h1", T0))
+    repo.save_if_changed(_record("h2", T0 + timedelta(hours=1)))
+
+    assert [v.hash for v in repo.versions_between(None, T0 + timedelta(days=1))] == ["h1", "h2"]
+
+
+def test_ensure_indexes_backfills_vigente_desde_of_old_documents(
+    repo: MongoBronzeRepository, mongo_db: Database[MongoDoc]
+) -> None:
+    # documentos gravados pela Etapa 02, antes do campo existir
+    mongo_db[CONTRATACOES].insert_one(
+        {"numero_controle_pncp": NUMERO, "hash": "velho", "payload": {}, "primeira_coleta": T0}
+    )
+
+    repo.ensure_indexes()
+
+    assert _vigente_desde(mongo_db, "velho") == T0
+    assert [v.hash for v in repo.versions_between(None, T0)] == ["velho"]
+
+
 # ------------------------------------------------------------------ documentos (outbox)
 
 

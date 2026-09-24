@@ -2,11 +2,13 @@
 
 Coleções:
 - `pncp_contratacoes`: uma versão por conteúdo distinto de cada contratação.
-  `primeira_coleta` = quando esse conteúdo apareceu; `ultima_coleta` = última vez visto.
+  `primeira_coleta` = quando esse conteúdo apareceu; `ultima_coleta` = última vez visto;
+  `vigente_desde` = quando ele passou a ser o conteúdo atual (lido pelo pipeline silver).
 - `pncp_documentos`: documentos baixados + controle do evento (outbox):
   `publicado_em` nulo = evento ainda não confirmado pelo broker.
 """
 
+from collections.abc import Iterator
 from dataclasses import asdict
 from datetime import datetime
 from typing import Any
@@ -14,7 +16,7 @@ from typing import Any
 from pymongo import ASCENDING, DESCENDING
 from pymongo.database import Database
 
-from radar.ports.bronze import BronzeRecord, StoredDocument
+from radar.ports.bronze import BronzeRecord, BronzeVersion, StoredDocument
 
 CONTRATACOES = "pncp_contratacoes"
 DOCUMENTOS = "pncp_documentos"
@@ -43,6 +45,14 @@ class MongoBronzeRepository:
             unique=True,
         )
         self._documentos.create_index([("publicado_em", ASCENDING)])
+        # leitura incremental do pipeline bronze -> silver
+        self._contratacoes.create_index([("vigente_desde", ASCENDING)])
+        # documentos gravados antes do campo existir (Etapa 02): a versão é vigente desde
+        # que apareceu. Update com pipeline ([...]) permite copiar um campo para outro.
+        self._contratacoes.update_many(
+            {"vigente_desde": {"$exists": False}},
+            [{"$set": {"vigente_desde": "$primeira_coleta"}}],
+        )
 
     def save_if_changed(self, record: BronzeRecord) -> bool:
         latest = self._contratacoes.find_one(
@@ -63,11 +73,31 @@ class MongoBronzeRepository:
                     "fonte": record.fonte,
                     "primeira_coleta": record.coletado_em,
                 },
-                "$set": {"ultima_coleta": record.coletado_em},
+                # vigente_desde só muda aqui (conteúdo novo ou A -> B -> A), nunca no _touch
+                "$set": {"ultima_coleta": record.coletado_em, "vigente_desde": record.coletado_em},
             },
             upsert=True,
         )
         return True
+
+    def versions_between(
+        self, depois_de: datetime | None, ate: datetime
+    ) -> Iterator[BronzeVersion]:
+        intervalo: MongoDoc = {"$lte": ate}
+        if depois_de is not None:
+            intervalo["$gt"] = depois_de
+        cursor = self._contratacoes.find(
+            {"vigente_desde": intervalo},
+            projection={
+                "_id": 0,
+                "numero_controle_pncp": 1,
+                "hash": 1,
+                "payload": 1,
+                "vigente_desde": 1,
+            },
+        ).sort([("vigente_desde", ASCENDING), ("numero_controle_pncp", ASCENDING)])
+        for doc in cursor:
+            yield BronzeVersion(**doc)
 
     def document_exists(self, numero_controle_pncp: str, sequencial_documento: int) -> bool:
         query = {

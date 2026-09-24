@@ -6,7 +6,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from radar.pipelines.bronze_to_silver import PIPELINE, BronzeToSilverPipeline
+from radar.config import Settings
+from radar.pipelines.bronze_to_silver import (
+    PIPELINE,
+    BronzeToSilverPipeline,
+    PipelineFactory,
+    RelatorioPipeline,
+    main,
+)
 from radar.ports.bronze import BronzeVersion
 from radar.ports.silver import MotivoRejeicao
 from tests.bronze_payloads import make_version, payload_with_numero
@@ -280,3 +287,47 @@ def test_batch_commit_count(
     make_pipeline(tamanho_lote=2).run()
 
     assert silver.commits == 3  # após 2, após 4 e o final (com a marca)
+
+
+# ------------------------------------------------------------------ linha de comando (main)
+
+
+class _SpyPipeline:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.calls: list[bool] = []
+        self.error = error
+
+    def run(self, *, completo: bool = False) -> RelatorioPipeline:
+        self.calls.append(completo)
+        if self.error:
+            raise self.error
+        return RelatorioPipeline(lidas=3, gravadas=2, rejeitadas=1)
+
+
+def _factory(spy: _SpyPipeline, closed: list[bool]) -> PipelineFactory:
+    def build(_settings: Settings) -> tuple[_SpyPipeline, Callable[[], None]]:
+        return spy, lambda: closed.append(True)
+
+    return build
+
+
+@pytest.mark.parametrize(("argv", "completo"), [([], False), (["--completo"], True)])
+def test_main_runs_pipeline_once_and_closes(argv: list[str], completo: bool) -> None:
+    spy = _SpyPipeline()
+    closed: list[bool] = []
+
+    code = main(argv, settings=Settings(), pipeline_factory=_factory(spy, closed))
+
+    assert code == 0
+    assert spy.calls == [completo]
+    assert closed == [True]
+
+
+def test_main_closes_connections_even_on_failure() -> None:
+    spy = _SpyPipeline(error=RuntimeError("banco fora do ar"))
+    closed: list[bool] = []
+
+    with pytest.raises(RuntimeError):
+        main([], settings=Settings(), pipeline_factory=_factory(spy, closed))
+
+    assert closed == [True]

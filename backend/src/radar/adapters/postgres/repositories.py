@@ -56,7 +56,7 @@ def _upsert(model: type[Base], rows: list[Row], conflict_columns: list[str]) -> 
 _FRESH = {"populate_existing": True}
 
 
-class _SqlRepository:
+class SqlRepository:
     def __init__(self, session: Session) -> None:
         self._session = session
 
@@ -69,7 +69,7 @@ class _SqlRepository:
             raise_as_domain_error(exc)
 
 
-class SqlOrgaoRepository(_SqlRepository):
+class SqlOrgaoRepository(SqlRepository):
     def add(self, orgao: Orgao) -> None:
         with self._savepoint():
             self._session.execute(insert(OrgaoModel).values(orgao_values(orgao)))
@@ -84,7 +84,7 @@ class SqlOrgaoRepository(_SqlRepository):
         return None if model is None else orgao_to_domain(model)
 
 
-class SqlFornecedorRepository(_SqlRepository):
+class SqlFornecedorRepository(SqlRepository):
     def add(self, fornecedor: Fornecedor) -> None:
         with self._savepoint():
             self._session.execute(insert(FornecedorModel).values(fornecedor_values(fornecedor)))
@@ -101,7 +101,7 @@ class SqlFornecedorRepository(_SqlRepository):
         return None if model is None else fornecedor_to_domain(model)
 
 
-class SqlContratacaoRepository(_SqlRepository):
+class SqlContratacaoRepository(SqlRepository):
     """Salva a contratação e seus itens juntos: é tudo ou nada (mesmo savepoint)."""
 
     def add(self, contratacao: Contratacao) -> None:
