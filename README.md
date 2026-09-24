@@ -65,6 +65,13 @@ make pipeline-completo   # reprocessa toda a bronze (depois de corrigir uma regr
 
 O que não passa na validação vai para `silver.registros_rejeitados`, com o motivo.
 
+Para montar a camada analítica (gold: star schema e marts, no schema `gold`):
+
+```bash
+make dbt                 # silver -> gold com dbt (modelos + testes)
+make dbt-docs            # documentação e linhagem em http://localhost:8080
+```
+
 | Serviço | Endereço local |
 |---|---|
 | API (docs interativas) | http://localhost:8000/docs |
@@ -91,6 +98,7 @@ make migrate           # aplica migrações pendentes do banco (o make up já fa
 make migration m="..." # gera uma nova migração a partir dos modelos
 make ingest-once       # roda uma ingestão do PNCP agora e termina
 make pipeline          # bronze -> silver (incremental)
+make dbt               # silver -> gold (dbt build: modelos + testes)
 make pre-commit-install  # instala os hooks que rodam a cada commit
 ```
 

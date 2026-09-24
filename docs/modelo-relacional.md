@@ -6,7 +6,11 @@ Banco transacional normalizado, no schema `silver` do PostgreSQL. É criado pela
 
 - 0001: schema inicial;
 - 0002: rejeitados, marca d'água e valor estimado anulável;
-- 0003: esfera "N".
+- 0003: esfera "N";
+- 0004: código NCM/NBS no item.
+
+A camada analítica (star schema no schema `gold`) é gerada pelo dbt a partir destas
+tabelas. Ver [`dbt/`](../dbt/) e o [ADR 0005](adr/0005-dbt-camada-gold.md).
 
 ## Diagrama
 
@@ -64,6 +68,7 @@ erDiagram
         numeric valor_unitario_estimado "nullable (sigiloso), >= 0"
         bigint fornecedor_id FK "nullable, indexada"
         numeric valor_unitario_homologado "nullable, >= 0"
+        varchar9 ncm_nbs "nullable, só dígitos"
         timestamptz criado_em
         timestamptz atualizado_em
     }

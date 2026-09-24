@@ -9,7 +9,7 @@ Marque `[x]` ao concluir. Só avance com `make check` verde e o documento de apr
 - [x] Etapa 01 — Domínio e modelo relacional
 - [x] Etapa 02 — Ingestão do PNCP (bronze + eventos)
 - [x] Etapa 03 — Pipeline bronze → silver com qualidade de dados
-- [ ] Etapa 04 — Camada analítica com dbt (gold)
+- [x] Etapa 04 — Camada analítica com dbt (gold)
 
 ## Fase 3 — Aplicação
 - [ ] Etapa 05 — API REST
