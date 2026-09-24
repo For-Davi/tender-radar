@@ -26,7 +26,7 @@ def test_health_returns_200_and_ok(client: TestClient) -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "quebrado"}
 
 
 def test_health_is_json(client: TestClient) -> None:
