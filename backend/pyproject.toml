@@ -16,7 +16,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
+    "httpx2>=2.13.1",
     "mypy>=2.3.1",
     "pika>=1.4.4",
     "pre-commit>=4.6.2",
@@ -41,8 +41,9 @@ src = ["src", "tests"]
 select = ["E", "W", "F", "I", "B", "UP", "N", "S", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
-# assert é o jeito normal de verificar em pytest (S101 proíbe assert em produção)
-"tests/**" = ["S101"]
+# S101: assert é o jeito normal de verificar em pytest (proibido só em produção)
+# S105/S106: senhas falsas escritas nos testes são intencionais
+"tests/**" = ["S101", "S105", "S106"]
 
 # ---------------------------------------------------------------- mypy
 [tool.mypy]
