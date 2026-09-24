@@ -4,12 +4,20 @@ import uuid
 from collections.abc import Iterator
 from pathlib import Path
 
+import pika
 import pytest
 from alembic import command
 from alembic.config import Config
+from pymongo import MongoClient
+from pymongo.database import Database
 from sqlalchemy import Connection, Engine, create_engine, make_url, text
 from sqlalchemy.orm import Session
+from testcontainers.community.mongodb import MongoDbContainer
 from testcontainers.community.postgres import PostgresContainer
+from testcontainers.community.rabbitmq import RabbitMqContainer
+
+from radar.adapters.mongo.bronze import MongoDoc
+from radar.adapters.rabbitmq.publisher import EDITAL_NOVO, EDITAL_NOVO_DLQ
 
 _BACKEND_DIR = Path(__file__).parents[2]
 _TABLES = "silver.item_contratacao, silver.contratacao, silver.fornecedor, silver.orgao"
@@ -65,3 +73,47 @@ def empty_db_engine(pg_container: PostgresContainer) -> Iterator[Engine]:
         with admin.connect() as conn:
             conn.execute(text(f'DROP DATABASE "{name}"'))
         admin.dispose()
+
+
+# ------------------------------------------------------------------ Mongo e RabbitMQ
+
+
+@pytest.fixture(scope="session")
+def mongo_container() -> Iterator[MongoDbContainer]:
+    with MongoDbContainer("mongo:7") as container:
+        yield container
+
+
+@pytest.fixture
+def mongo_db(mongo_container: MongoDbContainer) -> Iterator[Database[MongoDoc]]:
+    """Banco Mongo novo por teste (nome aleatório), apagado no final."""
+    # tz_aware=True: datas voltam com fuso (UTC), iguais às que foram gravadas
+    client: MongoClient[MongoDoc] = MongoClient(mongo_container.get_connection_url(), tz_aware=True)
+    db = client[f"test_{uuid.uuid4().hex[:12]}"]
+    try:
+        yield db
+    finally:
+        client.drop_database(db.name)
+        client.close()
+
+
+@pytest.fixture(scope="session")
+def rabbitmq_container() -> Iterator[RabbitMqContainer]:
+    with RabbitMqContainer("rabbitmq:3.13-management") as container:
+        yield container
+
+
+@pytest.fixture
+def rabbitmq_params(rabbitmq_container: RabbitMqContainer) -> Iterator[pika.ConnectionParameters]:
+    """Parâmetros de conexão; as filas do projeto são esvaziadas depois de cada teste."""
+    params = rabbitmq_container.get_connection_params()
+    yield params
+    connection = pika.BlockingConnection(params)
+    channel = connection.channel()
+    for queue in (EDITAL_NOVO, EDITAL_NOVO_DLQ):
+        # queue_declare passivo falha se a fila não existe; então só purga se existir
+        try:
+            channel.queue_purge(queue)
+        except pika.exceptions.ChannelClosedByBroker:
+            channel = connection.channel()
+    connection.close()
