@@ -6,7 +6,7 @@ Marque `[x]` ao concluir. Só avance com `make check` verde e o documento de apr
 - [x] Etapa 00 — Esqueleto, Docker e CI
 
 ## Fase 2 — Dados
-- [ ] Etapa 01 — Domínio e modelo relacional
+- [x] Etapa 01 — Domínio e modelo relacional
 - [ ] Etapa 02 — Ingestão do PNCP (bronze + eventos)
 - [ ] Etapa 03 — Pipeline bronze → silver com qualidade de dados
 - [ ] Etapa 04 — Camada analítica com dbt (gold)

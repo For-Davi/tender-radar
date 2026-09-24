@@ -73,10 +73,13 @@ make test-integration  # testes com containers reais (precisa de Docker)
 make lint              # ruff + mypy
 make fmt               # formata o código
 make check             # critério de "pronto": lint + tipos + testes + cobertura >= 80%
+make migrate           # aplica migrações pendentes do banco (o make up já faz isso)
+make migration m="..." # gera uma nova migração a partir dos modelos
 make pre-commit-install  # instala os hooks que rodam a cada commit
 ```
 
 ## Documentação
 
+- [Modelo relacional (diagrama ER)](docs/modelo-relacional.md)
 - [Decisões de arquitetura (ADRs)](docs/adr/)
 - [Documentos de aprendizado por etapa](docs/aprendizado/)
