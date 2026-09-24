@@ -141,10 +141,18 @@ class IngestaoService:
             hash=payload_hash(payload),
             coletado_em=self._clock(),
         )
-        if self._bronze.save_if_changed(record):
+        versao_nova = self._bronze.save_if_changed(record)
+        if versao_nova:
             report.versoes_novas += 1
         else:
             report.inalteradas += 1
+        log.info(
+            "contratacao_ingerida",
+            numero_controle_pncp=ref.numero_controle_pncp,
+            itens=len(itens),
+            versao_nova=versao_nova,
+            lidas_ate_agora=report.contratacoes_lidas,
+        )
 
         for documento in documentos:
             if documento.eh_edital:

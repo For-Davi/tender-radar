@@ -3,6 +3,7 @@
 from datetime import UTC, date, datetime
 
 import pytest
+import structlog.testing
 
 from radar.ports.contratacoes_source import RawItem
 from radar.services.ingestao import (
@@ -310,3 +311,17 @@ def test_pending_from_previous_run_is_published_at_start(env: Env) -> None:
 
     assert report.eventos_publicados == 1
     assert env.bronze.pending_documents() == []
+
+
+def test_each_contratacao_is_logged_for_progress(env: Env) -> None:
+    # com a API lenta, uma execução leva muito tempo: o log mostra o progresso
+    numero = env.add(1)
+
+    with structlog.testing.capture_logs() as logs:
+        env.service.run(JANELA)
+
+    (entry,) = [log for log in logs if log["event"] == "contratacao_ingerida"]
+    assert entry["numero_controle_pncp"] == numero
+    assert entry["itens"] == 2
+    assert entry["versao_nova"] is True
+    assert entry["lidas_ate_agora"] == 1
