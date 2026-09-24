@@ -1,0 +1,42 @@
+# --- Segredos e configuração local ---
+.env
+.env.*
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# --- Node / frontend ---
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+
+# --- dbt ---
+dbt/target/
+dbt/logs/
+dbt/dbt_packages/
+
+# --- Dados locais (nunca versionar dados brutos) ---
+data/*
+!data/golden_set/
+storage/
+
+# --- Editores e sistema ---
+.vscode/
+.idea/
+.DS_Store
+# metadados que o Windows cria ao copiar arquivos para o WSL
+*Zone.Identifier

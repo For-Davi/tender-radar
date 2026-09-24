@@ -1,0 +1,76 @@
+[project]
+name = "radar"
+version = "0.1.0"
+description = "Radar de Licitações: ingestão, análise e IA sobre contratações públicas do PNCP."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.141.1",
+    "pydantic-settings>=2.15.0",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.53.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.3.1",
+    "pika>=1.4.4",
+    "pre-commit>=4.6.2",
+    "psycopg[binary]>=3.3.6",
+    "pymongo>=4.18.2",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.8",
+    "testcontainers[mongodb,postgres,rabbitmq]>=4.15.0",
+    "types-pika>=1.2.0b1",
+]
+
+# ---------------------------------------------------------------- ruff (lint + format)
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# E/W: estilo PEP 8 | F: erros (pyflakes) | I: ordem de imports | B: bugs comuns
+# UP: sintaxe moderna | N: nomes | S: segurança | SIM: simplificações | RUF: regras do ruff
+select = ["E", "W", "F", "I", "B", "UP", "N", "S", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert é o jeito normal de verificar em pytest (S101 proíbe assert em produção)
+"tests/**" = ["S101"]
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+# bibliotecas de teste sem anotações de tipo completas
+module = ["testcontainers.*"]
+ignore_missing_imports = true
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "-ra"]
+markers = [
+  "unit: testes rápidos, sem I/O real (padrão)",
+  "integration: testes com containers reais (testcontainers)",
+]
+
+# ---------------------------------------------------------------- cobertura
+[tool.coverage.run]
+source = ["radar"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_empty = true
