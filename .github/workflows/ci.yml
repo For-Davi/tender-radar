@@ -1,0 +1,82 @@
+# Integração contínua: valida todo push e todo PR para a branch principal (dev).
+#
+#   lint ─────────────┐
+#   test-unit ────────┼──> docker-build
+#   test-integration ─┘
+#
+# Os três primeiros jobs rodam em paralelo; o build da imagem só roda se todos passarem.
+
+name: CI
+
+on:
+  push:
+    branches: [dev]
+  pull_request:
+    branches: [dev]
+
+# Um push novo na mesma branch cancela a execução anterior, que ficou obsoleta.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Menor privilégio: o workflow só lê o repositório.
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: backend
+
+jobs:
+  lint:
+    name: Lint (ruff + mypy)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true                     # cache dos pacotes baixados
+          cache-dependency-glob: backend/uv.lock # o cache muda só quando o lock muda
+      - run: uv sync --locked                    # --locked: falha se o uv.lock estiver desatualizado
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy src tests
+
+  test-unit:
+    name: Testes unitários + cobertura
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+      # fail_under = 80 no pyproject: abaixo disso o job falha
+      - run: uv run pytest -m unit --cov --cov-report=term-missing
+
+  test-integration:
+    name: Testes de integração (testcontainers)
+    runs-on: ubuntu-24.04                        # o runner já tem Docker instalado
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+      - run: uv run pytest -m integration
+
+  docker-build:
+    name: Build da imagem Docker
+    needs: [lint, test-unit, test-integration]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: backend
+          push: false                            # só valida que a imagem builda; publicar é na Etapa 10
+          cache-from: type=gha                   # reaproveita camadas entre execuções
+          cache-to: type=gha,mode=max

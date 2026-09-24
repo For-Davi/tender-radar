@@ -1,0 +1,37 @@
+# Verificações que rodam a cada `git commit`, antes do código sair da sua máquina.
+# Instalação (uma vez): make pre-commit-install
+# Rodar em todos os arquivos: make pre-commit
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files       # bloqueia arquivo > 1 MB (dados, PDFs, modelos)
+        args: ["--maxkb=1000"]
+      - id: check-merge-conflict          # marcadores <<<<<<< esquecidos
+      - id: check-yaml
+      - id: check-toml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.8                          # mesma versão do ruff no uv.lock
+    hooks:
+      - id: ruff-check
+        args: ["--fix"]
+      - id: ruff-format
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks                      # procura senhas, tokens e chaves no que vai ser commitado
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (strict)
+        # roda com o ambiente do projeto (uv) para enxergar as dependências reais
+        entry: bash -c "cd backend && uv run mypy src tests"
+        language: system
+        pass_filenames: false
+        files: ^backend/.*\.py$

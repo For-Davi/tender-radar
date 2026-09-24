@@ -4,7 +4,7 @@ BACKEND := backend
 UV := cd $(BACKEND) && uv run
 
 .DEFAULT_GOAL := help
-.PHONY: help up down down-volumes logs ps test test-integration lint fmt check
+.PHONY: help up down down-volumes logs ps test test-integration lint fmt check pre-commit-install pre-commit actionlint
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -46,3 +46,12 @@ fmt: ## Formata o código e aplica correções automáticas do ruff
 
 check: lint ## Critério de "pronto": lint + tipos + testes unitários com cobertura >= 80%
 	$(UV) pytest -m unit --cov --cov-report=term-missing
+
+pre-commit-install: ## Instala os hooks do git (rodam a cada commit)
+	$(UV) pre-commit install
+
+pre-commit: ## Roda os hooks do pre-commit em todos os arquivos
+	$(UV) pre-commit run --all-files
+
+actionlint: ## Valida os workflows do GitHub Actions (via Docker)
+	docker run --rm -v "$$PWD:/repo" -w /repo rhysd/actionlint:latest
