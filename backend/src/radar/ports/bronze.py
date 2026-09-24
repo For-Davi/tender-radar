@@ -4,6 +4,7 @@ O registro de documentos também funciona como *outbox*: um documento baixado na
 "pendente de evento" e só é marcado como publicado depois que o broker confirma.
 """
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
@@ -29,6 +30,27 @@ class StoredDocument:
     tamanho_bytes: int
     tipo_arquivo: str  # "pdf", "zip" ou "desconhecido"
     baixado_em: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class BronzeVersion:
+    """Uma versão (conteúdo distinto) de uma contratação, como lida pelo pipeline."""
+
+    numero_controle_pncp: str
+    hash: str
+    payload: JsonDict
+    vigente_desde: datetime  # quando este conteúdo passou a ser a versão atual
+
+
+class BronzeReader(Protocol):
+    def versions_between(
+        self, depois_de: datetime | None, ate: datetime
+    ) -> Iterator[BronzeVersion]:
+        """Versões que viraram a atual em (depois_de, ate], da mais antiga para a mais nova.
+
+        `depois_de=None` = desde o início (reprocessamento completo).
+        """
+        ...
 
 
 class BronzeRepository(Protocol):
