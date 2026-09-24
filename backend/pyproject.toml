@@ -65,6 +65,10 @@ markers = [
   "unit: testes rápidos, sem I/O real (padrão)",
   "integration: testes com containers reais (testcontainers)",
 ]
+filterwarnings = [
+  # aviso interno do testcontainers (código da biblioteca, não nosso); remover ao atualizar
+  "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning:testcontainers",
+]
 
 # ---------------------------------------------------------------- cobertura
 [tool.coverage.run]
