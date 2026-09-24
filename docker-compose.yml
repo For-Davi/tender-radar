@@ -103,6 +103,18 @@ services:
       mongo: { condition: service_healthy }
       rabbitmq: { condition: service_healthy }
 
+  # ---------- Jobs (rodam sob demanda: não sobem no "make up") ----------
+  pipeline-silver:
+    <<: *backend
+    # bronze (Mongo) -> silver (Postgres), só o que é novo desde a última execução
+    command: ["python", "-m", "radar.pipelines.bronze_to_silver"]
+    profiles: [jobs]                         # só roda quando chamado: make pipeline
+    restart: "no"
+    depends_on:
+      migrate: { condition: service_completed_successfully }   # tabelas da 0002 existem
+      postgres: { condition: service_healthy }
+      mongo: { condition: service_healthy }
+
 volumes:
   editais_data:
   pg_data:

@@ -4,7 +4,7 @@ BACKEND := backend
 UV := cd $(BACKEND) && uv run
 
 .DEFAULT_GOAL := help
-.PHONY: help up down down-volumes logs ps migrate migration ingest-once pncp-fixtures test test-integration lint fmt check pre-commit-install pre-commit actionlint
+.PHONY: help up down down-volumes logs ps migrate migration ingest-once pipeline pipeline-completo pncp-fixtures test test-integration lint fmt check pre-commit-install pre-commit actionlint
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -39,6 +39,13 @@ migration: .env ## Gera uma migração a partir dos modelos: make migration m="d
 # ---------- Ingestão ----------
 ingest-once: ## Roda uma ingestão agora (no container) e termina
 	docker compose run --rm --build worker-ingestao python -m radar.workers.ingestao --once
+
+# ---------- Pipeline bronze -> silver ----------
+pipeline: ## Bronze (Mongo) -> silver (Postgres): processa só o que é novo
+	docker compose run --rm --build pipeline-silver
+
+pipeline-completo: ## Reprocessa toda a bronze (ignora a marca d'água)
+	docker compose run --rm --build pipeline-silver python -m radar.pipelines.bronze_to_silver --completo
 
 pncp-fixtures: ## Regrava as fixtures do PNCP a partir da API real (manual, nunca no CI)
 	$(UV) python scripts/gravar_fixtures_pncp.py
