@@ -80,7 +80,11 @@ class Fornecedor:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ItemContratacao:
-    """Um item da contratação. O resultado (fornecedor + preço homologado) é opcional."""
+    """Um item da contratação. O resultado (fornecedor + preço homologado) é opcional.
+
+    `valor_unitario_estimado` é `None` quando o orçamento é sigiloso: o valor existe,
+    mas não é público. Nunca usar 0 para isso (0 envenenaria médias e o sobrepreço).
+    """
 
     numero_item: int
     descricao: str
@@ -88,7 +92,7 @@ class ItemContratacao:
     categoria: str | None
     quantidade: Decimal
     unidade_medida: str
-    valor_unitario_estimado: Dinheiro
+    valor_unitario_estimado: Dinheiro | None
     fornecedor_documento: str | None = None
     valor_unitario_homologado: Dinheiro | None = None
 
@@ -109,8 +113,10 @@ class ItemContratacao:
             )
 
     @property
-    def valor_total_estimado(self) -> Dinheiro:
+    def valor_total_estimado(self) -> Dinheiro | None:
         """Calculado, nunca armazenado: não tem como ficar inconsistente."""
+        if self.valor_unitario_estimado is None:
+            return None
         return self.valor_unitario_estimado * self.quantidade
 
     @property
@@ -163,8 +169,15 @@ class Contratacao:
         # tupla: quem lê `itens` não consegue fazer append e pular esta validação
         self.itens = (*current, item)
 
-    def valor_total_itens(self) -> Dinheiro:
-        return sum((item.valor_total_estimado for item in self.itens), Dinheiro.zero())
+    def valor_total_itens(self) -> Dinheiro | None:
+        """Soma dos itens; desconhecida (`None`) se algum item tiver valor sigiloso."""
+        total = Dinheiro.zero()
+        for item in self.itens:
+            valor = item.valor_total_estimado
+            if valor is None:
+                return None
+            total += valor
+        return total
 
     def _numero_controle_part(self, name: str) -> str:
         match = _NUMERO_CONTROLE.match(self.numero_controle_pncp)

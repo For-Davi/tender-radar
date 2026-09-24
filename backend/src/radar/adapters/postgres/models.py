@@ -25,6 +25,7 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from radar.domain.enums import (
@@ -35,6 +36,7 @@ from radar.domain.enums import (
     SituacaoContratacao,
     TipoPessoa,
 )
+from radar.ports.silver import MotivoRejeicao
 
 SCHEMA = "silver"
 
@@ -154,8 +156,53 @@ class ItemContratacaoModel(_AuditMixin, Base):
     categoria: Mapped[str | None] = mapped_column(Text)
     quantidade: Mapped[Decimal] = mapped_column(Numeric(18, 4))
     unidade_medida: Mapped[str] = mapped_column(Text)
-    valor_unitario_estimado: Mapped[Decimal] = mapped_column(Money)
+    # NULL = orçamento sigiloso (valor desconhecido); nunca gravar 0 no lugar
+    valor_unitario_estimado: Mapped[Decimal | None] = mapped_column(Money)
     fornecedor_id: Mapped[int | None] = mapped_column(ForeignKey(FornecedorModel.id), index=True)
     valor_unitario_homologado: Mapped[Decimal | None] = mapped_column(Money)
 
     fornecedor: Mapped[FornecedorModel | None] = relationship(lazy="raise")
+
+
+class RegistroRejeitadoModel(Base):
+    """Registros que não entraram na silver, com o motivo (qualidade de dados)."""
+
+    __tablename__ = "registros_rejeitados"
+    __table_args__ = (
+        # NULLS NOT DISTINCT (Postgres 15+): sem isso, duas linhas com numero_item NULL
+        # (rejeição da contratação inteira) não "conflitam", e reprocessar duplicaria
+        UniqueConstraint(
+            "numero_controle_pncp",
+            "bronze_hash",
+            "numero_item",
+            name="uq_registros_rejeitados_versao_item",
+            postgresql_nulls_not_distinct=True,
+        ),
+        CheckConstraint(_in_check("motivo", MotivoRejeicao), name="motivo_valido"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
+    fonte: Mapped[str] = mapped_column(String(20), server_default="pncp")
+    # Text: o número pode vir malformado do bruto (e ser justamente o motivo da rejeição).
+    # Sem index=True: o UNIQUE acima começa por esta coluna e já serve de índice para ela.
+    numero_controle_pncp: Mapped[str] = mapped_column(Text)
+    bronze_hash: Mapped[str] = mapped_column(String(64))
+    numero_item: Mapped[int | None] = mapped_column(Integer)
+    motivo: Mapped[str] = mapped_column(String(30), index=True)
+    # lista de {"campo": ..., "erro": ...}; JSONB permite consultar dentro do JSON
+    detalhes: Mapped[list[dict[str, str]]] = mapped_column(JSONB)
+    rejeitado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PipelineWatermarkModel(Base):
+    """Até onde cada pipeline incremental já processou (marca d'água)."""
+
+    __tablename__ = "pipeline_watermark"
+
+    pipeline: Mapped[str] = mapped_column(String(50), primary_key=True)
+    marca: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

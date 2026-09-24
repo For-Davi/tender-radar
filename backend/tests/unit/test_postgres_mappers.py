@@ -98,6 +98,15 @@ def test_contratacao_roundtrip_without_estimated_value() -> None:
     assert contratacao_to_domain(_as_loaded_model(contratacao)) == contratacao
 
 
+def test_item_with_unknown_estimate_roundtrip() -> None:
+    contratacao = make_contratacao(itens=[make_item(valor_unitario_estimado=None)])
+
+    model = _as_loaded_model(contratacao)
+
+    assert model.itens[0].valor_unitario_estimado is None  # NULL no banco, nunca 0
+    assert contratacao_to_domain(model) == contratacao
+
+
 def test_contratacao_values_stores_derived_columns() -> None:
     values = contratacao_values(
         make_contratacao(numero_controle_pncp="11222333000181-1-000042/2024"), orgao_id=7

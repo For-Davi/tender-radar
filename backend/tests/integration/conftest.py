@@ -20,7 +20,10 @@ from radar.adapters.mongo.bronze import MongoDoc
 from radar.adapters.rabbitmq.publisher import EDITAL_NOVO, EDITAL_NOVO_DLQ
 
 _BACKEND_DIR = Path(__file__).parents[2]
-_TABLES = "silver.item_contratacao, silver.contratacao, silver.fornecedor, silver.orgao"
+_TABLES = (
+    "silver.item_contratacao, silver.contratacao, silver.fornecedor, silver.orgao, "
+    "silver.registros_rejeitados, silver.pipeline_watermark"
+)
 
 
 def alembic_config(connection: Connection) -> Config:

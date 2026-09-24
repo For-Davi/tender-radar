@@ -103,6 +103,23 @@ def test_item_total_is_quantity_times_unit_price() -> None:
     assert item.valor_total_estimado == Dinheiro.de("7.50")
 
 
+def test_item_with_unknown_estimate_has_unknown_total() -> None:
+    # orçamento sigiloso: o PNCP manda 0, mas o valor é desconhecido, não zero
+    item = make_item(valor_unitario_estimado=None)
+
+    assert item.valor_unitario_estimado is None
+    assert item.valor_total_estimado is None
+
+
+def test_contratacao_total_of_items_is_unknown_if_any_item_is_unknown() -> None:
+    contratacao = make_contratacao(
+        itens=[make_item(numero_item=1), make_item(numero_item=2, valor_unitario_estimado=None)]
+    )
+
+    # somar o desconhecido como 0 daria um total falsamente baixo
+    assert contratacao.valor_total_itens() is None
+
+
 @pytest.mark.parametrize("quantidade", [Decimal("0"), Decimal("-1")])
 def test_item_quantity_must_be_positive(quantidade: Decimal) -> None:
     with pytest.raises(BusinessRuleError, match="quantidade"):
