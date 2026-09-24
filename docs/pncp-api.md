@@ -82,7 +82,9 @@ Lista: `sequencialDocumento`, `tipoDocumentoId` (**2 = Edital**), `tipoDocumento
 | Download do edital: `application/octet-stream` | Tipo detectado pelos bytes iniciais (`%PDF`, `PK`) |
 | API de consulta rápida (~0,6 s), **API de detalhes às vezes lenta (~33 s por chamada)** | Timeout de 90 s, retry com backoff, intervalo mínimo entre chamadas |
 | O PNCP adiciona campos novos com frequência (`emendaParlamentar`...) | Só os campos essenciais são validados; o bruto completo vai para a bronze |
-| No resultado, `numeroItem` pode vir diferente do número do item consultado (ex.: `5392694`) | Resultados guardados pela chave do item consultado (`resultados["1"]`); investigar na Etapa 03 |
+| No resultado, `numeroItem` pode vir diferente do número do item consultado (ex.: `5392694`) | Resultados guardados pela chave do item consultado (`resultados["1"]`). O pipeline da silver (Etapa 03) usa essa chave e ignora o `numeroItem` de dentro do resultado |
+| Vários resultados por item (registro de preços, `ordemClassificacaoSrp`) e resultados cancelados (`dataCancelamento`) | A silver guarda o 1º colocado não cancelado |
+| `esferaId: "N"` em consórcios públicos (não documentado junto com F/E/M/D) | Aceito como "não se aplica" (migração 0003) |
 
 ## Códigos de modalidade (`modalidadeId`)
 

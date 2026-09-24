@@ -1,8 +1,12 @@
 # Modelo relacional — camada silver
 
-Banco transacional normalizado, no schema `silver` do PostgreSQL. É criado pela migração
-[`0001_schema_inicial.py`](../backend/alembic/versions/0001_schema_inicial.py), a partir dos
-modelos em [`models.py`](../backend/src/radar/adapters/postgres/models.py).
+Banco transacional normalizado, no schema `silver` do PostgreSQL. É criado pelas migrações em
+[`alembic/versions/`](../backend/alembic/versions/) a partir dos modelos em
+[`models.py`](../backend/src/radar/adapters/postgres/models.py):
+
+- 0001: schema inicial;
+- 0002: rejeitados, marca d'água e valor estimado anulável;
+- 0003: esfera "N".
 
 ## Diagrama
 
@@ -16,7 +20,7 @@ erDiagram
         bigint id PK
         varchar14 cnpj UK "chave natural"
         text razao_social
-        varchar1 esfera "F E M D"
+        varchar1 esfera "F E M D N"
         varchar1 poder "E L J N"
         timestamptz criado_em
         timestamptz atualizado_em
@@ -57,13 +61,34 @@ erDiagram
         text categoria "nullable"
         numeric quantidade "> 0"
         text unidade_medida
-        numeric valor_unitario_estimado ">= 0"
+        numeric valor_unitario_estimado "nullable (sigiloso), >= 0"
         bigint fornecedor_id FK "nullable, indexada"
         numeric valor_unitario_homologado "nullable, >= 0"
         timestamptz criado_em
         timestamptz atualizado_em
     }
+
+    registros_rejeitados {
+        bigint id PK
+        varchar20 fonte "pncp"
+        text numero_controle_pncp "UK com bronze_hash e numero_item"
+        varchar64 bronze_hash "versão da bronze (linhagem)"
+        int numero_item "nullable: NULL = contratação inteira"
+        varchar30 motivo "indexada"
+        jsonb detalhes "campo e erro"
+        timestamptz rejeitado_em
+    }
+
+    pipeline_watermark {
+        varchar50 pipeline PK
+        timestamptz marca "até onde já processou"
+        timestamptz atualizado_em
+    }
 ```
+
+`registros_rejeitados` e `pipeline_watermark` não têm FK para as outras tabelas, porque
+guardam o que **não** entrou e o controle do pipeline. Ver a Etapa 03 e o
+[ADR 0004](adr/0004-qualidade-e-incremental-silver.md).
 
 Como ler as linhas: `||--o{` = "um para zero ou muitos"; `||--|{` = "um para um ou muitos";
 `|o--o{` = "zero ou um para zero ou muitos" (o item pode não ter vencedor ainda).
@@ -83,6 +108,8 @@ Como ler as linhas: `||--o{` = "um para zero ou muitos"; `||--|{` = "um para um 
 | `contratacao` | `CHECK modalidade IN (1..13)`, `situacao IN (1..4)` | Só códigos válidos do PNCP |
 | `contratacao`, `item_contratacao` | `CHECK` valores `>= 0`, `quantidade > 0` | Defesa em profundidade (o domínio já valida) |
 | `item_contratacao` | `CHECK (fornecedor_id IS NULL) = (valor_unitario_homologado IS NULL)` | Resultado completo ou ausente |
+| `registros_rejeitados` | `UNIQUE (numero_controle_pncp, bronze_hash, numero_item) NULLS NOT DISTINCT` | Reprocessar não duplica rejeições, nem as com `numero_item` NULL |
+| `registros_rejeitados` | `CHECK motivo IN (...)` | Só os motivos conhecidos |
 
 ## Normalização
 
@@ -102,6 +129,7 @@ Como ler as linhas: `||--o{` = "um para zero ou muitos"; `||--|{` = "um para um 
   ele nunca fica inconsistente. O dbt calcula quando precisar.
 
 **Limitação conhecida:** o resultado do item (fornecedor + preço homologado) fica no próprio
-item, o que supõe **um vencedor por item**. O PNCP permite, raramente, mais de um resultado
-por item. Se isso aparecer nos dados reais, o resultado vira uma tabela própria
-(`resultado_item`), numa nova migração. Ver [ADR 0002](adr/0002-dominio-separado-do-orm.md).
+item, o que supõe **um vencedor por item**. No registro de preços, o PNCP tem vários
+resultados por item (`ordemClassificacaoSrp`). Desde a Etapa 03, a silver guarda o
+1º colocado não cancelado. Se a análise precisar dos demais, o resultado vira uma tabela
+própria (`resultado_item`), numa nova migração. Ver [ADR 0002](adr/0002-dominio-separado-do-orm.md).

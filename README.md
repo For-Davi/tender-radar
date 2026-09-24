@@ -56,6 +56,15 @@ O worker de ingestão consulta o PNCP a cada hora (padrão: CE, pregão eletrôn
 dispensa, últimos 2 dias; ajuste no `.env`), guarda o bruto no MongoDB, baixa os editais
 e publica o evento `edital.novo` no RabbitMQ.
 
+Para levar o bruto para as tabelas limpas do Postgres (silver):
+
+```bash
+make pipeline            # bronze -> silver, só o que é novo desde a última execução
+make pipeline-completo   # reprocessa toda a bronze (depois de corrigir uma regra)
+```
+
+O que não passa na validação vai para `silver.registros_rejeitados`, com o motivo.
+
 | Serviço | Endereço local |
 |---|---|
 | API (docs interativas) | http://localhost:8000/docs |
@@ -81,6 +90,7 @@ make check             # critério de "pronto": lint + tipos + testes + cobertur
 make migrate           # aplica migrações pendentes do banco (o make up já faz isso)
 make migration m="..." # gera uma nova migração a partir dos modelos
 make ingest-once       # roda uma ingestão do PNCP agora e termina
+make pipeline          # bronze -> silver (incremental)
 make pre-commit-install  # instala os hooks que rodam a cada commit
 ```
 
