@@ -9,10 +9,9 @@ Plataforma que ingere contratações públicas do PNCP (Portal Nacional de Contr
 Públicas), extrai informações dos editais com LLM, permite perguntas via RAG, detecta
 possível sobrepreço com ML e exibe tudo num dashboard.
 
-Stack: Python 3.12 (uv, FastAPI, SQLAlchemy, Alembic, httpx, pydantic, pandera, pytest),
-PostgreSQL 16 + pgvector, MongoDB, RabbitMQ, MinIO, dbt, MLflow, Prefect,
-Next.js + TypeScript (Vitest, Testing Library, MSW, Playwright), Docker Compose,
-GitHub Actions.
+Stack: Python 3.12 (uv, FastAPI, SQLAlchemy, Alembic, httpx, pydantic, scikit-learn, pytest),
+PostgreSQL 16 + pgvector, MongoDB, RabbitMQ, dbt,
+Next.js + TypeScript (Vitest, Testing Library, MSW), Docker Compose, GitHub Actions.
 
 O plano completo está em `docs/ETAPAS.md`. O andamento está em `docs/PROGRESSO.md`.
 
@@ -34,12 +33,12 @@ radar-licitacoes/
 │   │   ├── config.py        # settings via pydantic-settings
 │   │   ├── domain/          # entidades e regras de negócio (sem I/O)
 │   │   ├── ports/           # interfaces (Protocols) que o domínio precisa
-│   │   ├── adapters/        # implementações: postgres, mongo, rabbitmq, minio, pncp, llm
+│   │   ├── adapters/        # implementações: postgres, mongo, rabbitmq, storage, pncp, llm
 │   │   ├── services/        # casos de uso que orquestram domínio + ports
 │   │   ├── api/             # FastAPI (routers, schemas, dependências)
 │   │   ├── workers/         # processos consumidores/agendados
 │   │   ├── pipelines/       # bronze -> silver
-│   │   ├── llm/             # extração, RAG, agente, avaliação
+│   │   ├── llm/             # extração, RAG, avaliação
 │   │   └── ml/              # features, treino, avaliação, inferência
 │   └── tests/
 │       ├── unit/            # rápidos, sem I/O real
@@ -114,7 +113,7 @@ radar-licitacoes/
 - **Proibido** fazer um teste passar apagando-o, pulando-o (`skip`), afrouxando o `assert`
   ou mockando o próprio código sob teste. Se um teste falha, corrija a causa raiz e explique.
 - Teste casos de erro e bordas, não só o caminho feliz.
-- Frontend: Vitest + Testing Library + MSW para componentes; Playwright para E2E.
+- Frontend: Vitest + Testing Library + MSW para componentes.
 
 ## Comandos (Makefile)
 
