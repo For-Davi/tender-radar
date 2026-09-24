@@ -4,7 +4,7 @@ BACKEND := backend
 UV := cd $(BACKEND) && uv run
 
 .DEFAULT_GOAL := help
-.PHONY: help up down down-volumes logs ps migrate migration ingest-once pipeline pipeline-completo pncp-fixtures test test-integration lint fmt check pre-commit-install pre-commit actionlint
+.PHONY: help up down down-volumes logs ps migrate migration ingest-once pipeline pipeline-completo dbt dbt-test dbt-docs pncp-fixtures test test-integration lint fmt check pre-commit-install pre-commit actionlint
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -46,6 +46,16 @@ pipeline: ## Bronze (Mongo) -> silver (Postgres): processa só o que é novo
 
 pipeline-completo: ## Reprocessa toda a bronze (ignora a marca d'água)
 	docker compose run --rm --build pipeline-silver python -m radar.pipelines.bronze_to_silver --completo
+
+# ---------- Camada gold (dbt) ----------
+dbt: ## Silver -> gold: seeds, modelos e todos os testes do dbt (no container)
+	docker compose run --rm --build dbt build
+
+dbt-test: ## Só os testes do dbt (dados + unit tests), sem reconstruir modelos
+	docker compose run --rm --build dbt test
+
+dbt-docs: .env ## Gera e abre a documentação do dbt (linhagem) em http://localhost:8080
+	cd dbt && set -a && . ../.env && set +a && uv run dbt docs generate && uv run dbt docs serve --port 8080
 
 pncp-fixtures: ## Regrava as fixtures do PNCP a partir da API real (manual, nunca no CI)
 	$(UV) python scripts/gravar_fixtures_pncp.py

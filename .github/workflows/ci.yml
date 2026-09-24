@@ -2,9 +2,10 @@
 #
 #   lint ─────────────┐
 #   test-unit ────────┼──> docker-build
-#   test-integration ─┘
+#   test-integration ─┤
+#   dbt ──────────────┘
 #
-# Os três primeiros jobs rodam em paralelo; o build da imagem só roda se todos passarem.
+# Os quatro primeiros jobs rodam em paralelo; o build da imagem só roda se todos passarem.
 
 name: CI
 
@@ -67,9 +68,42 @@ jobs:
       - run: uv sync --locked
       - run: uv run pytest -m integration
 
+  dbt:
+    name: dbt build (camada gold)
+    runs-on: ubuntu-24.04
+    # Postgres de verdade como "service container" do GitHub Actions
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: radar
+          POSTGRES_PASSWORD: radar
+          POSTGRES_DB: radar
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U radar"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0                # este repo não publica tag só com o major (v10)
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            backend/uv.lock
+            dbt/uv.lock
+      # as migrações do backend criam a silver (vazia): é o que o dbt lê
+      - run: uv sync --locked
+      - run: uv run alembic upgrade head
+      # dbt build = seeds + modelos + testes de dados + unit tests (os de janela usam
+      # entradas escritas à mão, então valem mesmo com a silver vazia)
+      - run: uv sync --locked
+        working-directory: dbt
+      - run: uv run dbt build
+        working-directory: dbt
+
   docker-build:
     name: Build da imagem Docker
-    needs: [lint, test-unit, test-integration]
+    needs: [lint, test-unit, test-integration, dbt]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7

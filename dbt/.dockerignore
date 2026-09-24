@@ -1,0 +1,5 @@
+# Artefatos locais do dbt e do uv: não entram na imagem
+.venv/
+target/
+logs/
+dbt_packages/

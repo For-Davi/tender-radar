@@ -115,6 +115,23 @@ services:
       postgres: { condition: service_healthy }
       mongo: { condition: service_healthy }
 
+  dbt:
+    # silver -> staging (views) -> gold (star schema + marts). Padrão: "dbt build"
+    # (seeds + modelos + testes). Outro comando: docker compose run --rm dbt test
+    build:
+      context: ./dbt
+    image: radar-dbt
+    profiles: [jobs]
+    restart: "no"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_HOST: postgres
+    depends_on:
+      migrate: { condition: service_completed_successfully }   # a silver precisa existir
+      postgres: { condition: service_healthy }
+
 volumes:
   editais_data:
   pg_data:
