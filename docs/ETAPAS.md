@@ -54,7 +54,6 @@ imagem vs container, multi-stage build, rede do Compose, healthcheck, pipeline d
   e falha com erro claro se uma variável estiver inválida.
 - `integration`: teste de fumaça que conecta em cada serviço (Postgres `SELECT 1` e extensão
   `vector` existe; Mongo responde `ping`; RabbitMQ aceita conexão).
-- Um PR de teste que quebra propositalmente um teste deixa o CI vermelho; corrigido, verde.
 
 **Pronto quando:** `make check` passa; `make up` deixa todos os serviços `healthy`;
 `docker compose exec api whoami` não é root; CI verde na branch principal.

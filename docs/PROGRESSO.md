@@ -3,7 +3,7 @@
 Marque `[x]` ao concluir. Só avance com `make check` verde e o documento de aprendizado escrito.
 
 ## Fase 1 — Fundação
-- [ ] Etapa 00 — Esqueleto, Docker e CI
+- [x] Etapa 00 — Esqueleto, Docker e CI
 
 ## Fase 2 — Dados
 - [ ] Etapa 01 — Domínio e modelo relacional

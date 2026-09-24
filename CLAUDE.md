@@ -72,7 +72,8 @@ radar-licitacoes/
 5. **Validação final:** rode `make check` (lint + tipos + testes + cobertura).
    A etapa só termina com tudo verde. Mostre a saída dos comandos.
 6. **Documento de aprendizado:** crie `docs/aprendizado/etapa-XX.md` seguindo o modelo abaixo.
-7. **Atualize** `docs/PROGRESSO.md` e, se houve decisão arquitetural, crie um ADR em `docs/adr/`.
+7. **Marque a etapa como concluída** em `docs/PROGRESSO.md` (troque `[ ]` por `[x]`) ao finalizá-la
+   e, se houve decisão arquitetural, crie um ADR em `docs/adr/`.
 8. **Commits** pequenos com Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
 9. **Resumo no chat:** o que foi feito, como rodar, como os testes provam que funciona,
    e 3 perguntas de revisão para o dono testar o próprio entendimento.

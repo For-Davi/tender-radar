@@ -297,6 +297,7 @@ cd backend && uv run uvicorn radar.api.main:app --reload
 | Teste de integração falha com erro de Docker | Docker Desktop desligado ou sem integração com o WSL | Abra o Docker Desktop → Settings → Resources → WSL integration |
 | Commit bloqueado pelo pre-commit | Um hook falhou (ex.: ruff ou gitleaks) | Leia a saída; o ruff e o `end-of-file-fixer` corrigem sozinhos, é só rodar `git add` de novo |
 | CI falha em `uv sync --locked` | O `pyproject.toml` mudou sem o `uv.lock` | Rode `uv lock` (ou `uv add`) e commite o `uv.lock` |
+| Todos os jobs do CI falham em **"Set up job"**, sem rodar nada | Uma action referenciada por uma tag que não existe. Aconteceu nesta etapa: `astral-sh/setup-uv@v10` não existe, porque essa action só publica versões completas (`v10.2.0`) | Confira as tags com `git ls-remote --tags https://github.com/<dono>/<action>.git` e use uma que exista. O actionlint **não** detecta isso |
 
 ## Perguntas de revisão
 
