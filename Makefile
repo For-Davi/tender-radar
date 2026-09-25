@@ -2,9 +2,12 @@
 
 BACKEND := backend
 UV := cd $(BACKEND) && uv run
+FRONTEND := frontend
+# npm com o Node do frontend/.nvmrc (via nvm, se instalado; no CI, o node do PATH)
+NPM := cd $(FRONTEND) && bash -c '[ -s "$$HOME/.nvm/nvm.sh" ] && . "$$HOME/.nvm/nvm.sh" && nvm use --silent >/dev/null; exec npm "$$@"' npm
 
 .DEFAULT_GOAL := help
-.PHONY: help up down down-volumes logs ps migrate migration ingest-once pipeline pipeline-completo dbt dbt-test dbt-docs pncp-fixtures test test-integration test-contract lint fmt check pre-commit-install pre-commit actionlint
+.PHONY: help up down down-volumes logs ps migrate migration ingest-once pipeline pipeline-completo dbt dbt-test dbt-docs pncp-fixtures test test-backend test-frontend test-integration test-contract lint lint-backend lint-frontend fmt check openapi frontend-install frontend-dev pre-commit-install pre-commit actionlint
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -60,9 +63,25 @@ dbt-docs: .env ## Gera e abre a documentação do dbt (linhagem) em http://local
 pncp-fixtures: ## Regrava as fixtures do PNCP a partir da API real (manual, nunca no CI)
 	$(UV) python scripts/gravar_fixtures_pncp.py
 
+# ---------- Frontend ----------
+frontend-install: ## Instala as dependências do frontend (npm ci, exatamente o package-lock)
+	$(NPM) ci
+
+frontend-dev: ## Frontend em modo desenvolvimento em http://localhost:3000 (API em :8000)
+	$(NPM) run dev
+
+openapi: ## Exporta o OpenAPI da API e regenera os tipos TypeScript do frontend
+	$(UV) python scripts/exportar_openapi.py
+	$(NPM) run openapi:types
+
 # ---------- Qualidade ----------
-test: ## Testes unitários (rápidos, sem Docker)
+test: test-backend test-frontend ## Testes unitários do backend e do frontend (sem Docker)
+
+test-backend: ## Testes unitários do backend
 	$(UV) pytest -m unit
+
+test-frontend: ## Testes do frontend (Vitest + Testing Library + MSW)
+	$(NPM) test
 
 test-integration: ## Testes de integração (sobem containers com testcontainers)
 	$(UV) pytest -m integration
@@ -70,17 +89,26 @@ test-integration: ## Testes de integração (sobem containers com testcontainers
 test-contract: .env ## Contrato API x gold: rode depois do make dbt (usa o Postgres do .env)
 	cd $(BACKEND) && set -a && . ../.env && set +a && uv run pytest -m contract
 
-lint: ## ruff (lint + formato) e mypy
+lint: lint-backend lint-frontend ## Lint, formato e tipos do backend e do frontend
+
+lint-backend: ## ruff (lint + formato) e mypy
 	$(UV) ruff check .
 	$(UV) ruff format --check .
 	$(UV) mypy src tests
 
-fmt: ## Formata o código e aplica correções automáticas do ruff
+lint-frontend: ## prettier, eslint e tsc (tipos das rotas gerados pelo next typegen)
+	$(NPM) run format:check
+	$(NPM) run lint
+	$(NPM) run typecheck
+
+fmt: ## Formata o código (backend e frontend) e aplica correções automáticas
 	$(UV) ruff format .
 	$(UV) ruff check --fix .
+	$(NPM) run format
 
-check: lint ## Critério de "pronto": lint + tipos + testes unitários com cobertura >= 80%
+check: lint ## Critério de "pronto": lint + tipos + testes com cobertura >= 80% (backend e frontend)
 	$(UV) pytest -m unit --cov --cov-report=term-missing
+	$(NPM) run coverage
 
 pre-commit-install: ## Instala os hooks do git (rodam a cada commit)
 	$(UV) pre-commit install

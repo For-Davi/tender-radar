@@ -93,6 +93,25 @@ services:
       retries: 5
       start_period: 10s
 
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # endereço da API visto pelo NAVEGADOR (entra no JavaScript no build)
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    image: radar-frontend
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      api: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      # a imagem não tem curl: o próprio Node faz a requisição (fetch nativo)
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   worker-ingestao:
     <<: *backend
     # a cada INGESTAO_INTERVALO_MINUTOS: PNCP -> Mongo (bronze) + PDFs + evento edital.novo
