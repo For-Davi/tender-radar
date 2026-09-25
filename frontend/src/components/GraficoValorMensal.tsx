@@ -28,7 +28,7 @@ export function GraficoValorMensal() {
   return (
     <figure
       aria-labelledby="titulo-valor-mensal"
-      className="rounded border border-slate-200 bg-white p-4"
+      className="min-w-0 rounded border border-slate-200 bg-white p-4"
     >
       <figcaption id="titulo-valor-mensal" className="mb-3 font-semibold">
         Valor contratado por mês
@@ -66,37 +66,46 @@ function Conteudo({ meses }: { meses: Mes[] }) {
               formatter={(valor) => formatarMoeda(Number(valor))}
             />
             <Legend />
-            <Bar dataKey="valor" name="Valor estimado" fill="#1d4ed8" />
-            <Line dataKey="media" name="Média móvel (3 meses)" stroke="#b45309" strokeWidth={2} />
+            <Bar dataKey="valor" name="Valor estimado" fill="#1d4ed8" isAnimationActive={false} />
+            <Line
+              dataKey="media"
+              name="Média móvel (3 meses)"
+              stroke="#b45309"
+              strokeWidth={2}
+              isAnimationActive={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-      <table className="sr-only">
-        <caption>Valor contratado por mês (dados do gráfico)</caption>
-        <thead>
-          <tr>
-            <th scope="col">Mês</th>
-            <th scope="col">Contratações</th>
-            <th scope="col">Valor estimado</th>
-            <th scope="col">Média móvel de 3 meses</th>
-          </tr>
-        </thead>
-        <tbody>
-          {meses.map((m) => (
-            <tr key={m.mes}>
-              <th scope="row">{formatarMes(m.mes)}</th>
-              <td>{formatarInteiro(m.contratacoes)}</td>
-              <td>{formatarMoeda(m.valor_total_estimado)}</td>
-              <td>
-                {formatarMoeda(m.media_movel_3m)}
-                {/* nos primeiros meses a média tem menos de 3 meses: quem lê precisa saber */}
-                {m.meses_na_media < 3 &&
-                  ` (${m.meses_na_media} ${m.meses_na_media === 1 ? "mês" : "meses"})`}
-              </td>
+      {/* sr-only numa div: uma <table> não aceita largura menor que o conteúdo */}
+      <div className="sr-only">
+        <table>
+          <caption>Valor contratado por mês (dados do gráfico)</caption>
+          <thead>
+            <tr>
+              <th scope="col">Mês</th>
+              <th scope="col">Contratações</th>
+              <th scope="col">Valor estimado</th>
+              <th scope="col">Média móvel de 3 meses</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {meses.map((m) => (
+              <tr key={m.mes}>
+                <th scope="row">{formatarMes(m.mes)}</th>
+                <td>{formatarInteiro(m.contratacoes)}</td>
+                <td>{formatarMoeda(m.valor_total_estimado)}</td>
+                <td>
+                  {formatarMoeda(m.media_movel_3m)}
+                  {/* nos primeiros meses a média tem menos de 3 meses: quem lê precisa saber */}
+                  {m.meses_na_media < 3 &&
+                    ` (${m.meses_na_media} ${m.meses_na_media === 1 ? "mês" : "meses"})`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

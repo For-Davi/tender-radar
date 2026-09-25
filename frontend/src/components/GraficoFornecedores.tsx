@@ -46,7 +46,7 @@ export function GraficoFornecedores() {
   return (
     <figure
       aria-labelledby="titulo-fornecedores"
-      className="rounded border border-slate-200 bg-white p-4"
+      className="min-w-0 rounded border border-slate-200 bg-white p-4"
     >
       <figcaption id="titulo-fornecedores" className="mb-3 font-semibold">
         Top fornecedores por valor homologado
@@ -74,31 +74,34 @@ function Conteudo({ fornecedores }: { fornecedores: FornecedorTotal[] }) {
             <XAxis type="number" tickFormatter={formatarMoedaCompacta} />
             <YAxis type="category" dataKey="nome" width={200} tick={{ fontSize: 12 }} />
             <Tooltip formatter={(valor) => formatarMoeda(Number(valor))} />
-            <Bar dataKey="valor" name="Valor homologado" fill="#1d4ed8" />
+            <Bar dataKey="valor" name="Valor homologado" fill="#1d4ed8" isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>
-      <table className="sr-only">
-        <caption>Top fornecedores por valor homologado (dados do gráfico)</caption>
-        <thead>
-          <tr>
-            <th scope="col">Fornecedor</th>
-            <th scope="col">Valor homologado</th>
-            <th scope="col">Itens vencidos</th>
-            <th scope="col">Órgãos</th>
-          </tr>
-        </thead>
-        <tbody>
-          {fornecedores.map((f) => (
-            <tr key={f.documento}>
-              <th scope="row">{f.nome}</th>
-              <td>{formatarMoeda(f.valor)}</td>
-              <td>{formatarInteiro(f.itens)}</td>
-              <td>{formatarInteiro(f.orgaos)}</td>
+      {/* sr-only numa div: uma <table> não aceita largura menor que o conteúdo */}
+      <div className="sr-only">
+        <table>
+          <caption>Top fornecedores por valor homologado (dados do gráfico)</caption>
+          <thead>
+            <tr>
+              <th scope="col">Fornecedor</th>
+              <th scope="col">Valor homologado</th>
+              <th scope="col">Itens vencidos</th>
+              <th scope="col">Órgãos</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {fornecedores.map((f) => (
+              <tr key={f.documento}>
+                <th scope="row">{f.nome}</th>
+                <td>{formatarMoeda(f.valor)}</td>
+                <td>{formatarInteiro(f.itens)}</td>
+                <td>{formatarInteiro(f.orgaos)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

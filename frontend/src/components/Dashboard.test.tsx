@@ -143,6 +143,23 @@ describe("Dashboard — top fornecedores", () => {
   });
 });
 
+describe("Dashboard — tabelas acessíveis dos gráficos", () => {
+  it("o sr-only fica numa div em volta, nunca na própria <table>", async () => {
+    // bug visto no navegador real: <table class="sr-only"> ignora width: 1px (tabela não
+    // encolhe abaixo do conteúdo) e criava uma rolagem horizontal invisível no painel
+    renderComApi(<Dashboard />);
+
+    const tabelas = [
+      await screen.findByRole("table", { name: /Valor contratado por mês/ }),
+      await screen.findByRole("table", { name: /Top fornecedores/ }),
+    ];
+    for (const tabela of tabelas) {
+      expect(tabela).not.toHaveClass("sr-only");
+      expect(tabela.parentElement).toHaveClass("sr-only");
+    }
+  });
+});
+
 describe("agregarFornecedores", () => {
   const linha = RANKING[0]!;
 
