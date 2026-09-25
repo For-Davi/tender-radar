@@ -1,11 +1,12 @@
 # Integração contínua: valida todo push e todo PR para a branch principal (dev).
 #
 #   lint ─────────────┐
-#   test-unit ────────┼──> docker-build
-#   test-integration ─┤
-#   dbt ──────────────┘
+#   test-unit ────────┤
+#   test-integration ─┼──> docker-build (backend + frontend)
+#   dbt ──────────────┤
+#   frontend ─────────┘
 #
-# Os quatro primeiros jobs rodam em paralelo; o build da imagem só roda se todos passarem.
+# Os cinco primeiros jobs rodam em paralelo; o build das imagens só roda se todos passarem.
 
 name: CI
 
@@ -104,9 +105,43 @@ jobs:
       # (as definições em backend/src/radar/adapters/postgres/gold.py)
       - run: uv run pytest -m contract
 
+  frontend:
+    name: Frontend (formato, lint, tipos, testes, contrato OpenAPI)
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"               # sem telemetria anônima do Next
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc     # a mesma versão do ambiente local (24)
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci                              # exatamente o package-lock
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run coverage                    # thresholds de 80% no vitest.config.mts
+      # Contrato backend -> frontend: regenera o OpenAPI a partir da API e os tipos
+      # TypeScript a partir dele. Se algo mudou, alguém alterou a API sem rodar
+      # "make openapi": o frontend estaria compilando contra tipos velhos.
+      - uses: astral-sh/setup-uv@v10.2.0                # este repo não publica tag só com o major (v10)
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked
+        working-directory: backend
+      - run: uv run python scripts/exportar_openapi.py
+        working-directory: backend
+      - run: npm run openapi:types
+      - run: git diff --exit-code -- openapi.json src/lib/api/schema.d.ts
+
   docker-build:
-    name: Build da imagem Docker
-    needs: [lint, test-unit, test-integration, dbt]
+    name: Build das imagens Docker
+    needs: [lint, test-unit, test-integration, dbt, frontend]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -115,5 +150,12 @@ jobs:
         with:
           context: backend
           push: false                            # só valida que a imagem builda; publicar é na Etapa 10
-          cache-from: type=gha                   # reaproveita camadas entre execuções
-          cache-to: type=gha,mode=max
+          # reaproveita camadas entre execuções; um "scope" por imagem para não se sobrescreverem
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - uses: docker/build-push-action@v7
+        with:
+          context: frontend
+          push: false
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
