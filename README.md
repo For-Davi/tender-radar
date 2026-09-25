@@ -37,16 +37,17 @@ O plano completo, etapa por etapa, está em [docs/ETAPAS.md](docs/ETAPAS.md) e o
 | Backend | Python 3.12, uv, FastAPI, Pydantic, SQLAlchemy, Alembic, structlog |
 | Dados | PostgreSQL 16 + pgvector, MongoDB, RabbitMQ, dbt |
 | IA / ML | LLM (Anthropic), RAG com pgvector, scikit-learn |
-| Frontend | Next.js, TypeScript |
-| Qualidade | pytest, testcontainers, ruff, mypy (strict), pre-commit |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind, TanStack Query, Recharts |
+| Qualidade | pytest, testcontainers, ruff, mypy (strict), Vitest, Testing Library, MSW, ESLint, Prettier, pre-commit |
 | Entrega | Docker, Docker Compose, GitHub Actions |
 
 ## Como rodar
 
 Pré-requisitos: Linux (ou WSL2), Docker com Compose v2, `make` e [uv](https://docs.astral.sh/uv/).
+Para desenvolver o frontend fora do Docker: Node 24 (`nvm install 24`; o `frontend/.nvmrc` seleciona a versão).
 
 ```bash
-make up          # cria o .env, sobe Postgres, Mongo, RabbitMQ, a API e o worker de ingestão
+make up          # cria o .env, sobe Postgres, Mongo, RabbitMQ, a API, o frontend e o worker de ingestão
 curl localhost:8000/health        # {"status":"ok"}
 make logs s=worker-ingestao       # acompanha a ingestão do PNCP
 make down        # derruba a stack (os dados continuam nos volumes)
@@ -98,6 +99,7 @@ curl "localhost:8000/contratacoes?uf=CE&categoria=30&ordenar=-valor_total_estima
 
 | Serviço | Endereço local |
 |---|---|
+| **Frontend (painel)** | http://localhost:3000 |
 | API (docs interativas) | http://localhost:8000/docs |
 | RabbitMQ (UI de gestão) | http://localhost:15672 (usuário e senha do `.env`) |
 | PostgreSQL | `localhost:5432` |
@@ -109,15 +111,22 @@ Para rodar a API fora do Docker, com recarga automática:
 cd backend && uv run uvicorn radar.api.main:app --reload
 ```
 
+Para o frontend com recarga automática (com a API no ar):
+
+```bash
+make frontend-install && make frontend-dev   # http://localhost:3000
+```
+
 ## Desenvolvimento
 
 ```bash
 make help              # lista todos os comandos
-make test              # testes unitários (rápidos, sem Docker)
+make test              # testes unitários do backend e do frontend (rápidos, sem Docker)
 make test-integration  # testes com containers reais (precisa de Docker)
 make test-contract     # contrato API x gold (depois do make dbt)
-make lint              # ruff + mypy
-make fmt               # formata o código
+make lint              # ruff + mypy (backend); prettier + eslint + tsc (frontend)
+make fmt               # formata o código (backend e frontend)
+make openapi           # depois de mudar a API: regenera o OpenAPI e os tipos do frontend
 make check             # critério de "pronto": lint + tipos + testes + cobertura >= 80%
 make migrate           # aplica migrações pendentes do banco (o make up já faz isso)
 make migration m="..." # gera uma nova migração a partir dos modelos

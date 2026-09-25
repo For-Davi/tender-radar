@@ -13,7 +13,7 @@ Marque `[x]` ao concluir. Só avance com `make check` verde e o documento de apr
 
 ## Fase 3 — Aplicação
 - [x] Etapa 05 — API REST
-- [ ] Etapa 06 — Frontend: dashboard
+- [x] Etapa 06 — Frontend: dashboard
 
 ## Fase 4 — IA e ML
 - [ ] Etapa 07 — Extração com LLM + avaliação
