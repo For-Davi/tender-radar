@@ -72,6 +72,30 @@ make dbt                 # silver -> gold com dbt (modelos + testes)
 make dbt-docs            # documentação e linhagem em http://localhost:8080
 ```
 
+### API REST
+
+A API é só de leitura. As contratações vêm da silver, que está sempre atualizada. As
+métricas vêm dos marts da gold, que só existem depois do `make dbt`; antes disso, essas
+rotas respondem 503.
+
+| Rota | O que devolve |
+|---|---|
+| `GET /contratacoes` | Lista paginada. Filtros: `uf`, `orgao` (CNPJ), `categoria` (capítulo NCM), `data_inicio`/`data_fim`, `valor_min`/`valor_max`. Ordenação: `ordenar=-data_publicacao` (padrão), `data_publicacao`, `valor_total_estimado`, `-valor_total_estimado` |
+| `GET /contratacoes/{id}` | Detalhe com órgão, itens e vencedor. O `id` é o número de controle do PNCP com `-` no lugar de `/` |
+| `GET /orgaos` | Órgãos com o total de contratações (filtro `uf`) |
+| `GET /categorias` | Valores do filtro `categoria` |
+| `GET /metricas/valor-mensal` | Valor contratado por mês e média móvel de 3 meses |
+| `GET /metricas/preco-categoria` | Preço mediano por categoria, unidade e mês, com a variação mês a mês |
+| `GET /metricas/ranking-fornecedores` | Ranking de fornecedores por órgão (filtro `orgao`) |
+| `GET /metricas/precos-acima-p90` | Itens com preço no percentil 90 ou acima (base do sobrepreço) |
+
+```bash
+curl "localhost:8000/contratacoes?uf=CE&categoria=30&ordenar=-valor_total_estimado&tamanho_pagina=5"
+```
+
+- **Erros:** saem no formato `application/problem+json` (RFC 9457).
+- **Dinheiro:** vai como texto decimal (`"1500.0000"`), nunca como float.
+
 | Serviço | Endereço local |
 |---|---|
 | API (docs interativas) | http://localhost:8000/docs |
@@ -91,6 +115,7 @@ cd backend && uv run uvicorn radar.api.main:app --reload
 make help              # lista todos os comandos
 make test              # testes unitários (rápidos, sem Docker)
 make test-integration  # testes com containers reais (precisa de Docker)
+make test-contract     # contrato API x gold (depois do make dbt)
 make lint              # ruff + mypy
 make fmt               # formata o código
 make check             # critério de "pronto": lint + tipos + testes + cobertura >= 80%
