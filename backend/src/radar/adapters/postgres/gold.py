@@ -14,6 +14,7 @@ definição com as tabelas reais.
 
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
@@ -35,6 +36,7 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
 from radar.domain.enums import MaterialOuServico
+from radar.domain.value_objects import Dinheiro
 from radar.ports.consultas import Pagina, PaginaPedido
 from radar.ports.metricas import (
     AnaliticoIndisponivelError,
@@ -140,6 +142,11 @@ def _gold_disponivel() -> Iterator[None]:
         raise
 
 
+def _dinheiro(valor: Decimal) -> Decimal:
+    """Somas de `quantidade x preço` no dbt saem com 8 casas; a API usa sempre 4."""
+    return Dinheiro(valor).valor
+
+
 def _to_categoria(row: Row[Any]) -> Categoria:
     return Categoria(
         material_ou_servico=MaterialOuServico(row.material_ou_servico),
@@ -172,7 +179,7 @@ class SqlMetricasQueries:
                 mes=row.mes,
                 contratacoes=row.contratacoes,
                 itens=row.itens,
-                valor_total_estimado=row.valor_total_estimado,
+                valor_total_estimado=_dinheiro(row.valor_total_estimado),
                 media_movel_3m=row.media_movel_3m,
                 meses_na_media=row.meses_na_media,
             ),
@@ -234,7 +241,7 @@ class SqlMetricasQueries:
                 fornecedor_documento=row.documento,
                 fornecedor_nome=row.nome,
                 itens_vencidos=row.itens_vencidos,
-                valor_total_homologado=row.valor_total_homologado,
+                valor_total_homologado=_dinheiro(row.valor_total_homologado),
                 ranking=row.ranking,
                 participacao_percentual=row.participacao_percentual,
             ),

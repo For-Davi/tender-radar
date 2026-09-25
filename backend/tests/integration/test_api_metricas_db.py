@@ -200,3 +200,29 @@ def test_precos_acima_p90_only_alerts_most_expensive_first(api_client: TestClien
     assert [i["numero_item"] for i in segunda["itens"]] == [4]
     assert primeira["itens"][0]["contratacao_id"] == f"{CNPJ_A}-1-000001-2026"
     assert primeira["itens"][0]["orgao_razao_social"] == "Prefeitura A"
+
+
+def test_money_from_gold_has_four_decimal_places(gold: Engine, api_client: TestClient) -> None:
+    # bug achado na execução real: soma de quantidade x preço no dbt vinha com 8 casas
+    _insert(
+        gold,
+        mart_valor_contratado_mensal,
+        [{"mes": date(2026, 9, 1), "contratacoes": 1, "itens": 1,
+          "valor_total_estimado": Decimal("148851981.78880000"),
+          "media_movel_3m": Decimal("148851981.79"), "meses_na_media": 1}],
+    )  # fmt: skip
+    _insert(gold, dim_orgao, [{"orgao_key": "oA", "cnpj": CNPJ_A, "razao_social": "A"}])
+    _insert(gold, dim_fornecedor, [{"fornecedor_key": "f1", "documento": "1", "nome": "F"}])
+    _insert(
+        gold,
+        mart_ranking_fornecedor_orgao,
+        [{"orgao_key": "oA", "fornecedor_key": "f1", "itens_vencidos": 1,
+          "valor_total_homologado": Decimal("10.12345678"), "ranking": 1,
+          "participacao_percentual": 100}],
+    )  # fmt: skip
+
+    mensal = api_client.get("/metricas/valor-mensal").json()[0]
+    ranking = api_client.get("/metricas/ranking-fornecedores").json()[0]
+
+    assert mensal["valor_total_estimado"] == "148851981.7888"
+    assert ranking["valor_total_homologado"] == "10.1235"

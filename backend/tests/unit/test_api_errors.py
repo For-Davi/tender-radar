@@ -121,3 +121,18 @@ def test_cors_only_allows_get(api: TestClient) -> None:
     )
 
     assert response.status_code == 400
+
+
+def test_422_message_has_no_pydantic_prefix(api: TestClient) -> None:
+    # bug achado na execução real: "Value error, UF inválida: 'XX'"
+    erro = api.get("/contratacoes", params={"uf": "XX"}).json()["erros"][0]
+
+    assert erro["mensagem"] == "UF inválida: 'XX'"
+
+
+def test_422_cross_field_message_has_no_pydantic_prefix(api: TestClient) -> None:
+    params = {"valor_min": "2", "valor_max": "1"}
+
+    erro = api.get("/contratacoes", params=params).json()["erros"][0]
+
+    assert erro == {"campo": "query", "mensagem": "valor_min não pode ser maior que valor_max"}

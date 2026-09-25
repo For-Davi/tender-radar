@@ -116,11 +116,23 @@ def _http_exception(request: Request, exc: Exception) -> JSONResponse:
     return problem_response(request, exc.status_code, detail, headers=exc.headers)
 
 
+def _mensagem(error: Mapping[str, Any]) -> str:
+    """Texto do erro para o usuário.
+
+    Nos validadores nossos (ValueError), o Pydantic prefixa "Value error, " na `msg`;
+    a exceção original, sem prefixo, fica em `ctx["error"]`.
+    """
+    original = error.get("ctx", {}).get("error")
+    if error.get("type") == "value_error" and isinstance(original, ValueError):
+        return str(original)
+    return str(error["msg"])
+
+
 def _validation_error(request: Request, exc: Exception) -> JSONResponse:
     if not isinstance(exc, RequestValidationError):
         raise exc
     erros = [
-        ErroCampo(campo=".".join(str(part) for part in error["loc"]), mensagem=error["msg"])
+        ErroCampo(campo=".".join(str(part) for part in error["loc"]), mensagem=_mensagem(error))
         for error in exc.errors()
     ]
     return problem_response(request, 422, "parâmetros inválidos", erros=erros)
