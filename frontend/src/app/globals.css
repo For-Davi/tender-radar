@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+/* Tailwind 4: a configuração do tema fica no próprio CSS (não há tailwind.config.js). */
+@theme {
+  /* fonte do sistema: nada a baixar no build nem no primeiro acesso */
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* cor da marca: contraste >= 4.5:1 sobre branco (WCAG AA para texto) */
+  --color-marca: #1d4ed8;
+  --color-alerta: #b91c1c;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+/* foco sempre visível para quem navega pelo teclado */
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-marca;
+}

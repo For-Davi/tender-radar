@@ -1,0 +1,1544 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "radar",
+    "description": "\nContratações públicas do PNCP, limpas (camada silver) e analisadas (camada gold).\n\n- **Erros** seguem o formato `application/problem+json` (RFC 9457).\n- **Dinheiro** é enviado como texto decimal (`\"1234.5600\"`), nunca como float.\n- **Datas** de filtro são dias no horário de Brasília.\n",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "infra"
+        ],
+        "summary": "Health",
+        "description": "Usado pelo healthcheck do Docker e por monitores externos.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contratacoes": {
+      "get": {
+        "tags": [
+          "contratações"
+        ],
+        "summary": "Listar Contratacoes",
+        "description": "Lista contratações com filtros combináveis, paginação e ordenação.",
+        "operationId": "listar_contratacoes_contratacoes_get",
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Página desejada (1 = primeira)",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página desejada (1 = primeira)"
+          },
+          {
+            "name": "tamanho_pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página",
+              "default": 20,
+              "title": "Tamanho Pagina"
+            },
+            "description": "Itens por página"
+          },
+          {
+            "name": "uf",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "Sigla da UF, ex.: CE"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Uf"
+            }
+          },
+          {
+            "name": "orgao",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "CNPJ do órgão, com ou sem máscara",
+                  "examples": [
+                    "07.954.480/0001-79"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Orgao"
+            }
+          },
+          {
+            "name": "categoria",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{2}$",
+                  "description": "Capítulo NCM/NBS (2 dígitos). Valores em GET /categorias",
+                  "examples": [
+                    "30"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Categoria"
+            }
+          },
+          {
+            "name": "data_inicio",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Publicadas a partir deste dia",
+              "title": "Data Inicio"
+            },
+            "description": "Publicadas a partir deste dia"
+          },
+          {
+            "name": "data_fim",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Publicadas até este dia (inclusive)",
+              "title": "Data Fim"
+            },
+            "description": "Publicadas até este dia (inclusive)"
+          },
+          {
+            "name": "valor_min",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Valor total estimado mínimo",
+              "title": "Valor Min"
+            },
+            "description": "Valor total estimado mínimo"
+          },
+          {
+            "name": "valor_max",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0.0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Valor total estimado máximo",
+              "title": "Valor Max"
+            },
+            "description": "Valor total estimado máximo"
+          },
+          {
+            "name": "ordenar",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Ordenacao",
+              "description": "`-` na frente = decrescente",
+              "default": "-data_publicacao"
+            },
+            "description": "`-` na frente = decrescente"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaResponse_ContratacaoResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/contratacoes/{id}": {
+      "get": {
+        "tags": [
+          "contratações"
+        ],
+        "summary": "Detalhar Contratacao",
+        "description": "Detalhe de uma contratação, com o órgão e todos os itens (e o vencedor de cada um).",
+        "operationId": "detalhar_contratacao_contratacoes__id__get",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9A-Z]{12}\\d{2}-1-\\d{6}-\\d{4}$",
+              "description": "Número de controle PNCP com '-' no lugar de '/'",
+              "examples": [
+                "07954480000179-1-000123-2025"
+              ],
+              "title": "Id"
+            },
+            "description": "Número de controle PNCP com '-' no lugar de '/'"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContratacaoDetalheResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orgaos": {
+      "get": {
+        "tags": [
+          "órgãos"
+        ],
+        "summary": "Listar Orgaos",
+        "description": "Órgãos em ordem alfabética. Com `uf`, só os que publicaram contratações na UF.",
+        "operationId": "listar_orgaos_orgaos_get",
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Página desejada (1 = primeira)",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página desejada (1 = primeira)"
+          },
+          {
+            "name": "tamanho_pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página",
+              "default": 20,
+              "title": "Tamanho Pagina"
+            },
+            "description": "Itens por página"
+          },
+          {
+            "name": "uf",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "Sigla da UF, ex.: CE"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Uf"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaResponse_OrgaoResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/categorias": {
+      "get": {
+        "tags": [
+          "categorias"
+        ],
+        "summary": "Listar Categorias",
+        "description": "Categorias (tipo + capítulo NCM/NBS). Use `ncm_capitulo` no filtro `categoria`.",
+        "operationId": "listar_categorias_categorias_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoriaResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Categorias Categorias Get"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metricas/valor-mensal": {
+      "get": {
+        "tags": [
+          "métricas"
+        ],
+        "summary": "Valor Mensal",
+        "description": "Valor estimado contratado por mês, com média móvel de 3 meses (sem buracos).",
+        "operationId": "valor_mensal_metricas_valor_mensal_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ValorMensalResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Valor Mensal Metricas Valor Mensal Get"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metricas/preco-categoria": {
+      "get": {
+        "tags": [
+          "métricas"
+        ],
+        "summary": "Preco Categoria",
+        "description": "Preço mediano por categoria, unidade e mês, com a variação sobre o mês anterior.",
+        "operationId": "preco_categoria_metricas_preco_categoria_get",
+        "parameters": [
+          {
+            "name": "categoria",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{2}$",
+                  "description": "Capítulo NCM/NBS (2 dígitos). Valores em GET /categorias",
+                  "examples": [
+                    "30"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Categoria"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrecoCategoriaResponse"
+                  },
+                  "title": "Response Preco Categoria Metricas Preco Categoria Get"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metricas/ranking-fornecedores": {
+      "get": {
+        "tags": [
+          "métricas"
+        ],
+        "summary": "Ranking Fornecedores",
+        "description": "Ranking dos fornecedores de cada órgão pelo valor homologado.",
+        "operationId": "ranking_fornecedores_metricas_ranking_fornecedores_get",
+        "parameters": [
+          {
+            "name": "orgao",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "description": "CNPJ do órgão, com ou sem máscara",
+                  "examples": [
+                    "07.954.480/0001-79"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Orgao"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RankingFornecedorResponse"
+                  },
+                  "title": "Response Ranking Fornecedores Metricas Ranking Fornecedores Get"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metricas/precos-acima-p90": {
+      "get": {
+        "tags": [
+          "métricas"
+        ],
+        "summary": "Precos Acima P90",
+        "description": "Itens com preço no percentil 90 ou acima entre os comparáveis (base do sobrepreço).\n\nSó entram itens de categoria classificada (com NCM) e grupos com amostra mínima.",
+        "operationId": "precos_acima_p90_metricas_precos_acima_p90_get",
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Página desejada (1 = primeira)",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página desejada (1 = primeira)"
+          },
+          {
+            "name": "tamanho_pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Itens por página",
+              "default": 20,
+              "title": "Tamanho Pagina"
+            },
+            "description": "Itens por página"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaResponse_PrecoAcimaP90Response_"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetail"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CategoriaResponse": {
+        "properties": {
+          "material_ou_servico": {
+            "$ref": "#/components/schemas/MaterialOuServico"
+          },
+          "ncm_capitulo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncm Capitulo",
+            "description": "Valor para o filtro `categoria`; null = sem classificação (não filtrável)"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "material_ou_servico",
+          "ncm_capitulo",
+          "nome"
+        ],
+        "title": "CategoriaResponse"
+      },
+      "ContratacaoDetalheResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Id público: número de controle PNCP com '-' no lugar de '/'"
+          },
+          "numero_controle_pncp": {
+            "type": "string",
+            "title": "Numero Controle Pncp"
+          },
+          "orgao": {
+            "$ref": "#/components/schemas/OrgaoRefResponse"
+          },
+          "modalidade": {
+            "type": "integer",
+            "title": "Modalidade"
+          },
+          "modalidade_nome": {
+            "type": "string",
+            "title": "Modalidade Nome"
+          },
+          "situacao": {
+            "type": "integer",
+            "title": "Situacao"
+          },
+          "situacao_nome": {
+            "type": "string",
+            "title": "Situacao Nome"
+          },
+          "objeto": {
+            "type": "string",
+            "title": "Objeto"
+          },
+          "valor_total_estimado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Total Estimado",
+            "description": "null = orçamento sigiloso"
+          },
+          "data_publicacao": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data Publicacao"
+          },
+          "uf": {
+            "type": "string",
+            "title": "Uf"
+          },
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "total_itens": {
+            "type": "integer",
+            "title": "Total Itens"
+          },
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/ItemResponse"
+            },
+            "type": "array",
+            "title": "Itens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero_controle_pncp",
+          "orgao",
+          "modalidade",
+          "modalidade_nome",
+          "situacao",
+          "situacao_nome",
+          "objeto",
+          "valor_total_estimado",
+          "data_publicacao",
+          "uf",
+          "municipio",
+          "total_itens",
+          "itens"
+        ],
+        "title": "ContratacaoDetalheResponse"
+      },
+      "ContratacaoResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Id público: número de controle PNCP com '-' no lugar de '/'"
+          },
+          "numero_controle_pncp": {
+            "type": "string",
+            "title": "Numero Controle Pncp"
+          },
+          "orgao": {
+            "$ref": "#/components/schemas/OrgaoRefResponse"
+          },
+          "modalidade": {
+            "type": "integer",
+            "title": "Modalidade"
+          },
+          "modalidade_nome": {
+            "type": "string",
+            "title": "Modalidade Nome"
+          },
+          "situacao": {
+            "type": "integer",
+            "title": "Situacao"
+          },
+          "situacao_nome": {
+            "type": "string",
+            "title": "Situacao Nome"
+          },
+          "objeto": {
+            "type": "string",
+            "title": "Objeto"
+          },
+          "valor_total_estimado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Total Estimado",
+            "description": "null = orçamento sigiloso"
+          },
+          "data_publicacao": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Data Publicacao"
+          },
+          "uf": {
+            "type": "string",
+            "title": "Uf"
+          },
+          "municipio": {
+            "type": "string",
+            "title": "Municipio"
+          },
+          "total_itens": {
+            "type": "integer",
+            "title": "Total Itens"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "numero_controle_pncp",
+          "orgao",
+          "modalidade",
+          "modalidade_nome",
+          "situacao",
+          "situacao_nome",
+          "objeto",
+          "valor_total_estimado",
+          "data_publicacao",
+          "uf",
+          "municipio",
+          "total_itens"
+        ],
+        "title": "ContratacaoResponse"
+      },
+      "Esfera": {
+        "type": "string",
+        "enum": [
+          "F",
+          "E",
+          "M",
+          "D",
+          "N"
+        ],
+        "title": "Esfera"
+      },
+      "FornecedorResponse": {
+        "properties": {
+          "documento": {
+            "type": "string",
+            "title": "Documento"
+          },
+          "nome": {
+            "type": "string",
+            "title": "Nome"
+          },
+          "tipo_pessoa": {
+            "$ref": "#/components/schemas/TipoPessoa"
+          },
+          "tipo_pessoa_nome": {
+            "type": "string",
+            "title": "Tipo Pessoa Nome"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documento",
+          "nome",
+          "tipo_pessoa",
+          "tipo_pessoa_nome"
+        ],
+        "title": "FornecedorResponse"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "HealthResponse"
+      },
+      "ItemResponse": {
+        "properties": {
+          "numero_item": {
+            "type": "integer",
+            "title": "Numero Item"
+          },
+          "descricao": {
+            "type": "string",
+            "title": "Descricao"
+          },
+          "material_ou_servico": {
+            "$ref": "#/components/schemas/MaterialOuServico"
+          },
+          "material_ou_servico_nome": {
+            "type": "string",
+            "title": "Material Ou Servico Nome"
+          },
+          "ncm_nbs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ncm Nbs"
+          },
+          "quantidade": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Quantidade"
+          },
+          "unidade_medida": {
+            "type": "string",
+            "title": "Unidade Medida"
+          },
+          "valor_unitario_estimado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Unitario Estimado",
+            "description": "null = orçamento sigiloso"
+          },
+          "valor_total_estimado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Total Estimado"
+          },
+          "vencedor": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FornecedorResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null = ainda sem resultado"
+          },
+          "valor_unitario_homologado": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Valor Unitario Homologado"
+          }
+        },
+        "type": "object",
+        "required": [
+          "numero_item",
+          "descricao",
+          "material_ou_servico",
+          "material_ou_servico_nome",
+          "ncm_nbs",
+          "quantidade",
+          "unidade_medida",
+          "valor_unitario_estimado",
+          "valor_total_estimado",
+          "vencedor",
+          "valor_unitario_homologado"
+        ],
+        "title": "ItemResponse"
+      },
+      "MaterialOuServico": {
+        "type": "string",
+        "enum": [
+          "M",
+          "S"
+        ],
+        "title": "MaterialOuServico"
+      },
+      "Ordenacao": {
+        "type": "string",
+        "enum": [
+          "-data_publicacao",
+          "data_publicacao",
+          "-valor_total_estimado",
+          "valor_total_estimado"
+        ],
+        "title": "Ordenacao",
+        "description": "Ordenações aceitas. O `-` na frente é decrescente (convenção comum em APIs)."
+      },
+      "OrgaoRefResponse": {
+        "properties": {
+          "cnpj": {
+            "type": "string",
+            "title": "Cnpj"
+          },
+          "razao_social": {
+            "type": "string",
+            "title": "Razao Social"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cnpj",
+          "razao_social"
+        ],
+        "title": "OrgaoRefResponse"
+      },
+      "OrgaoResponse": {
+        "properties": {
+          "cnpj": {
+            "type": "string",
+            "title": "Cnpj"
+          },
+          "razao_social": {
+            "type": "string",
+            "title": "Razao Social"
+          },
+          "esfera": {
+            "$ref": "#/components/schemas/Esfera"
+          },
+          "esfera_nome": {
+            "type": "string",
+            "title": "Esfera Nome"
+          },
+          "poder": {
+            "$ref": "#/components/schemas/Poder"
+          },
+          "poder_nome": {
+            "type": "string",
+            "title": "Poder Nome"
+          },
+          "total_contratacoes": {
+            "type": "integer",
+            "title": "Total Contratacoes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "cnpj",
+          "razao_social",
+          "esfera",
+          "esfera_nome",
+          "poder",
+          "poder_nome",
+          "total_contratacoes"
+        ],
+        "title": "OrgaoResponse"
+      },
+      "PaginaResponse_ContratacaoResponse_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/ContratacaoResponse"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Registros que atendem ao filtro, em todas as páginas"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho_pagina": {
+            "type": "integer",
+            "title": "Tamanho Pagina"
+          },
+          "total_paginas": {
+            "type": "integer",
+            "title": "Total Paginas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho_pagina",
+          "total_paginas"
+        ],
+        "title": "PaginaResponse[ContratacaoResponse]"
+      },
+      "PaginaResponse_OrgaoResponse_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/OrgaoResponse"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Registros que atendem ao filtro, em todas as páginas"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho_pagina": {
+            "type": "integer",
+            "title": "Tamanho Pagina"
+          },
+          "total_paginas": {
+            "type": "integer",
+            "title": "Total Paginas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho_pagina",
+          "total_paginas"
+        ],
+        "title": "PaginaResponse[OrgaoResponse]"
+      },
+      "PaginaResponse_PrecoAcimaP90Response_": {
+        "properties": {
+          "itens": {
+            "items": {
+              "$ref": "#/components/schemas/PrecoAcimaP90Response"
+            },
+            "type": "array",
+            "title": "Itens"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Registros que atendem ao filtro, em todas as páginas"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "tamanho_pagina": {
+            "type": "integer",
+            "title": "Tamanho Pagina"
+          },
+          "total_paginas": {
+            "type": "integer",
+            "title": "Total Paginas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "itens",
+          "total",
+          "pagina",
+          "tamanho_pagina",
+          "total_paginas"
+        ],
+        "title": "PaginaResponse[PrecoAcimaP90Response]"
+      },
+      "Poder": {
+        "type": "string",
+        "enum": [
+          "E",
+          "L",
+          "J",
+          "N"
+        ],
+        "title": "Poder"
+      },
+      "PrecoAcimaP90Response": {
+        "properties": {
+          "contratacao_id": {
+            "type": "string",
+            "title": "Contratacao Id",
+            "description": "Id público, para GET /contratacoes/{id}"
+          },
+          "numero_controle_pncp": {
+            "type": "string",
+            "title": "Numero Controle Pncp"
+          },
+          "numero_item": {
+            "type": "integer",
+            "title": "Numero Item"
+          },
+          "orgao_razao_social": {
+            "type": "string",
+            "title": "Orgao Razao Social"
+          },
+          "categoria_nome": {
+            "type": "string",
+            "title": "Categoria Nome"
+          },
+          "unidade": {
+            "type": "string",
+            "title": "Unidade"
+          },
+          "data_publicacao": {
+            "type": "string",
+            "format": "date",
+            "title": "Data Publicacao"
+          },
+          "valor_unitario_estimado": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Valor Unitario Estimado"
+          },
+          "percentil_preco": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Percentil Preco",
+            "description": "0 = mais barato, 1 = mais caro do grupo"
+          },
+          "itens_comparaveis": {
+            "type": "integer",
+            "title": "Itens Comparaveis"
+          }
+        },
+        "type": "object",
+        "required": [
+          "contratacao_id",
+          "numero_controle_pncp",
+          "numero_item",
+          "orgao_razao_social",
+          "categoria_nome",
+          "unidade",
+          "data_publicacao",
+          "valor_unitario_estimado",
+          "percentil_preco",
+          "itens_comparaveis"
+        ],
+        "title": "PrecoAcimaP90Response"
+      },
+      "PrecoCategoriaResponse": {
+        "properties": {
+          "categoria": {
+            "$ref": "#/components/schemas/CategoriaResponse"
+          },
+          "unidade": {
+            "type": "string",
+            "title": "Unidade"
+          },
+          "mes": {
+            "type": "string",
+            "format": "date",
+            "title": "Mes"
+          },
+          "itens": {
+            "type": "integer",
+            "title": "Itens"
+          },
+          "preco_medio": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Preco Medio"
+          },
+          "preco_mediano": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Preco Mediano"
+          },
+          "preco_mediano_mes_anterior": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preco Mediano Mes Anterior",
+            "description": "null quando o mês imediatamente anterior não teve itens"
+          },
+          "variacao_percentual": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variacao Percentual"
+          }
+        },
+        "type": "object",
+        "required": [
+          "categoria",
+          "unidade",
+          "mes",
+          "itens",
+          "preco_medio",
+          "preco_mediano",
+          "preco_mediano_mes_anterior",
+          "variacao_percentual"
+        ],
+        "title": "PrecoCategoriaResponse"
+      },
+      "RankingFornecedorResponse": {
+        "properties": {
+          "orgao_cnpj": {
+            "type": "string",
+            "title": "Orgao Cnpj"
+          },
+          "orgao_razao_social": {
+            "type": "string",
+            "title": "Orgao Razao Social"
+          },
+          "fornecedor_documento": {
+            "type": "string",
+            "title": "Fornecedor Documento"
+          },
+          "fornecedor_nome": {
+            "type": "string",
+            "title": "Fornecedor Nome"
+          },
+          "itens_vencidos": {
+            "type": "integer",
+            "title": "Itens Vencidos"
+          },
+          "valor_total_homologado": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Valor Total Homologado"
+          },
+          "ranking": {
+            "type": "integer",
+            "title": "Ranking",
+            "description": "RANK: empatados dividem a posição e a seguinte é pulada"
+          },
+          "participacao_percentual": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Participacao Percentual"
+          }
+        },
+        "type": "object",
+        "required": [
+          "orgao_cnpj",
+          "orgao_razao_social",
+          "fornecedor_documento",
+          "fornecedor_nome",
+          "itens_vencidos",
+          "valor_total_homologado",
+          "ranking",
+          "participacao_percentual"
+        ],
+        "title": "RankingFornecedorResponse"
+      },
+      "TipoPessoa": {
+        "type": "string",
+        "enum": [
+          "PJ",
+          "PF",
+          "PE"
+        ],
+        "title": "TipoPessoa"
+      },
+      "ValorMensalResponse": {
+        "properties": {
+          "mes": {
+            "type": "string",
+            "format": "date",
+            "title": "Mes",
+            "description": "Primeiro dia do mês"
+          },
+          "contratacoes": {
+            "type": "integer",
+            "title": "Contratacoes"
+          },
+          "itens": {
+            "type": "integer",
+            "title": "Itens"
+          },
+          "valor_total_estimado": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Valor Total Estimado"
+          },
+          "media_movel_3m": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Media Movel 3M"
+          },
+          "meses_na_media": {
+            "type": "integer",
+            "title": "Meses Na Media",
+            "description": "Menor que 3 nos primeiros meses da série"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mes",
+          "contratacoes",
+          "itens",
+          "valor_total_estimado",
+          "media_movel_3m",
+          "meses_na_media"
+        ],
+        "title": "ValorMensalResponse"
+      },
+      "ErroCampo": {
+        "properties": {
+          "campo": {
+            "title": "Campo",
+            "type": "string"
+          },
+          "mensagem": {
+            "title": "Mensagem",
+            "type": "string"
+          }
+        },
+        "required": [
+          "campo",
+          "mensagem"
+        ],
+        "title": "ErroCampo",
+        "type": "object"
+      },
+      "ProblemDetail": {
+        "properties": {
+          "type": {
+            "default": "about:blank",
+            "title": "Type",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "integer"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Detail"
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Instance"
+          },
+          "erros": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ErroCampo"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Erros"
+          }
+        },
+        "required": [
+          "title",
+          "status"
+        ],
+        "title": "ProblemDetail",
+        "type": "object"
+      }
+    }
+  }
+}

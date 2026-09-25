@@ -35,3 +35,18 @@ repos:
         language: system
         pass_filenames: false
         files: ^backend/.*\.py$
+
+      - id: frontend-prettier
+        name: prettier (frontend)
+        # carrega o Node do .nvmrc (24) via nvm; o formato é o mesmo do make lint
+        entry: bash -c '. "$HOME/.nvm/nvm.sh" && cd frontend && nvm use --silent && npx --no-install prettier --check .'
+        language: system
+        pass_filenames: false
+        files: ^frontend/
+
+      - id: frontend-eslint
+        name: eslint (frontend)
+        entry: bash -c '. "$HOME/.nvm/nvm.sh" && cd frontend && nvm use --silent && npx --no-install eslint --max-warnings=0 .'
+        language: system
+        pass_filenames: false
+        files: ^frontend/

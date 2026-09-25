@@ -1,0 +1,6 @@
+# gerado pelo backend (make openapi) e formatado pelo próprio script
+openapi.json
+.next
+coverage
+node_modules
+package-lock.json
