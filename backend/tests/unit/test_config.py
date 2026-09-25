@@ -158,3 +158,24 @@ def test_secrets_not_exposed_in_repr() -> None:
 
     assert "segredo-mongo" not in repr(settings)
     assert "segredo-rabbit" not in repr(settings)
+
+
+def test_cors_origins_default_is_local_frontend() -> None:
+    assert Settings().cors_origins == ["http://localhost:3000"]
+
+
+def test_cors_origins_read_from_comma_separated_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CORS_ORIGINS", "http://localhost:3000/, https://radar.exemplo.com.br")
+
+    # espaços e a barra final são removidos: o navegador manda a origem sem barra
+    assert Settings().cors_origins == ["http://localhost:3000", "https://radar.exemplo.com.br"]
+
+
+@pytest.mark.parametrize("value", ["", " , ", "*", "http://localhost:3000,*"])
+def test_invalid_cors_origins_fail_clearly(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("CORS_ORIGINS", value)
+
+    with pytest.raises(ValidationError) as exc_info:
+        Settings()
+
+    assert exc_info.value.errors()[0]["loc"][0] == "cors_origins"

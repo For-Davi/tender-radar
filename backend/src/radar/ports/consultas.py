@@ -28,6 +28,7 @@ from radar.domain.enums import (
     SituacaoContratacao,
     TipoPessoa,
 )
+from radar.domain.value_objects import Dinheiro
 
 TAMANHO_PAGINA_MAXIMO = 100
 
@@ -145,10 +146,13 @@ class ItemDetalhe:
 
     @property
     def valor_total_estimado(self) -> Decimal | None:
-        """Calculado (como na entidade): desconhecido se o preço for sigiloso."""
+        """Calculado (como na entidade): desconhecido se o preço for sigiloso.
+
+        Passa pelo  para ter 4 casas: 4999.9000 x 10.0000 daria 8 casas.
+        """
         if self.valor_unitario_estimado is None:
             return None
-        return self.valor_unitario_estimado * self.quantidade
+        return (Dinheiro(self.valor_unitario_estimado) * self.quantidade).valor
 
 
 @dataclass(frozen=True, slots=True)

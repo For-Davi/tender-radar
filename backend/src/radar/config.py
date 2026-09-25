@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     log_level: LogLevel = "INFO"
     log_json: bool = False  # True em container: um JSON por linha, fácil de indexar
 
+    # ---------- API ----------
+    # origens (esquema + host + porta) que o navegador pode usar para chamar a API
+    cors_origins: CommaList = ["http://localhost:3000"]
+
     postgres_host: str = "localhost"
     postgres_port: int = Field(default=5432, ge=1, le=65535)
     postgres_user: str = "radar"
@@ -82,6 +86,19 @@ class Settings(BaseSettings):
             invalid = [uf for uf in value if uf not in UFS]
             if invalid:
                 raise ValueError(f"UF(s) inválida(s): {invalid}")
+        return value
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def _parse_cors_origins(cls, value: object) -> object:
+        if isinstance(value, str):
+            value = [origin.strip().rstrip("/") for origin in value.split(",") if origin.strip()]
+        if isinstance(value, list):
+            if not value:
+                raise ValueError("informe ao menos uma origem para o CORS")
+            if "*" in value:
+                # "*" liberaria qualquer site a ler a API pelo navegador do usuário
+                raise ValueError("CORS com '*' não é permitido: liste as origens")
         return value
 
     @field_validator("ingestao_modalidades", mode="before")
