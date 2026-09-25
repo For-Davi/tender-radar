@@ -1,4 +1,4 @@
-"""Fixtures de integração com Postgres real (testcontainers)."""
+"""Fixtures de integração com serviços reais (testcontainers) e a API sobre eles."""
 
 import uuid
 from collections.abc import Iterator
@@ -6,8 +6,10 @@ from pathlib import Path
 
 import pika
 import pytest
+import structlog
 from alembic import command
 from alembic.config import Config
+from fastapi.testclient import TestClient
 from pymongo import MongoClient
 from pymongo.database import Database
 from sqlalchemy import Connection, Engine, create_engine, make_url, text
@@ -17,7 +19,10 @@ from testcontainers.community.postgres import PostgresContainer
 from testcontainers.community.rabbitmq import RabbitMqContainer
 
 from radar.adapters.mongo.bronze import MongoDoc
+from radar.adapters.postgres.gold import GOLD_METADATA
 from radar.adapters.rabbitmq.publisher import EDITAL_NOVO, EDITAL_NOVO_DLQ
+from radar.api.main import create_app
+from radar.config import Settings
 
 _BACKEND_DIR = Path(__file__).parents[2]
 _TABLES = (
@@ -120,3 +125,28 @@ def rabbitmq_params(rabbitmq_container: RabbitMqContainer) -> Iterator[pika.Conn
         except pika.exceptions.ChannelClosedByBroker:
             channel = connection.channel()
     connection.close()
+
+
+# ------------------------------------------------------------------ API
+
+
+@pytest.fixture
+def api_client(engine: Engine) -> Iterator[TestClient]:
+    """A app de verdade (rotas, adapters SQL) usando o Postgres do container."""
+    app = create_app(Settings(app_name="radar-integracao"), engine=engine)
+    yield TestClient(app)
+    structlog.reset_defaults()
+
+
+@pytest.fixture
+def gold(engine: Engine) -> Iterator[Engine]:
+    """Schema gold com as tabelas descritas em `gold.py` (no projeto, quem cria é o dbt).
+
+    O teste de contrato (`tests/contract/`) garante que esta descrição bate com o dbt.
+    """
+    with engine.begin() as conn:
+        conn.execute(text("CREATE SCHEMA gold"))
+        GOLD_METADATA.create_all(conn)
+    yield engine
+    with engine.begin() as conn:
+        conn.execute(text("DROP SCHEMA gold CASCADE"))
