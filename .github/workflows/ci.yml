@@ -69,7 +69,7 @@ jobs:
       - run: uv run pytest -m integration
 
   dbt:
-    name: dbt build (camada gold)
+    name: dbt build (camada gold) + contrato da API
     runs-on: ubuntu-24.04
     # Postgres de verdade como "service container" do GitHub Actions
     services:
@@ -100,6 +100,9 @@ jobs:
         working-directory: dbt
       - run: uv run dbt build
         working-directory: dbt
+      # contrato API x gold: as colunas que a API lê existem nas tabelas que o dbt gerou
+      # (as definições em backend/src/radar/adapters/postgres/gold.py)
+      - run: uv run pytest -m contract
 
   docker-build:
     name: Build da imagem Docker

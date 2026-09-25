@@ -4,7 +4,7 @@ BACKEND := backend
 UV := cd $(BACKEND) && uv run
 
 .DEFAULT_GOAL := help
-.PHONY: help up down down-volumes logs ps migrate migration ingest-once pipeline pipeline-completo dbt dbt-test dbt-docs pncp-fixtures test test-integration lint fmt check pre-commit-install pre-commit actionlint
+.PHONY: help up down down-volumes logs ps migrate migration ingest-once pipeline pipeline-completo dbt dbt-test dbt-docs pncp-fixtures test test-integration test-contract lint fmt check pre-commit-install pre-commit actionlint
 
 help: ## Lista os comandos disponíveis
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-18s %s\n", $$1, $$2}'
@@ -66,6 +66,9 @@ test: ## Testes unitários (rápidos, sem Docker)
 
 test-integration: ## Testes de integração (sobem containers com testcontainers)
 	$(UV) pytest -m integration
+
+test-contract: .env ## Contrato API x gold: rode depois do make dbt (usa o Postgres do .env)
+	cd $(BACKEND) && set -a && . ../.env && set +a && uv run pytest -m contract
 
 lint: ## ruff (lint + formato) e mypy
 	$(UV) ruff check .

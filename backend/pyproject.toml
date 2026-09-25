@@ -71,6 +71,7 @@ addopts = ["--strict-markers", "-ra"]
 markers = [
   "unit: testes rápidos, sem I/O real (padrão)",
   "integration: testes com containers reais (testcontainers)",
+  "contract: contrato API x gold; roda contra um banco onde o dbt build já rodou",
 ]
 filterwarnings = [
   # aviso interno do testcontainers (código da biblioteca, não nosso); remover ao atualizar
